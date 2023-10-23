@@ -1,6 +1,8 @@
 import os
 from dotenv import load_dotenv
 import logging
+import re
+
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.constants import ParseMode
@@ -97,11 +99,38 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ]
             )
 
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=text,
-                reply_markup=keyboard,
-                parse_mode=ParseMode.HTML)
+            try:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    reply_markup=keyboard,
+                    parse_mode=ParseMode.HTML
+                    )
+            except Exception:
+                cleaned_name = re.sub(r'[^a-zA-Zа-яА-Я]', '', name)
+
+                logging.critical(
+                    f'Функцией {handle_location.__name__} '
+                    f'получено глючное имя "{name}" .'
+                    f'Исправлено и передано в кнопку как "{cleaned_name}".')
+
+                keyboard = InlineKeyboardMarkup(
+                    [
+                        [InlineKeyboardButton(
+                            'Смотреть на карте',
+                            callback_data=(f'b1|{element_id}|'
+                                           f'{cleaned_name}|'
+                                           f'{response_lat}|'
+                                           f'{response_lon}')
+                            )],
+                    ]
+                )
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    reply_markup=keyboard,
+                    parse_mode=ParseMode.HTML
+                    )
 
 
 async def b1(update: Update, context: CallbackContext):
