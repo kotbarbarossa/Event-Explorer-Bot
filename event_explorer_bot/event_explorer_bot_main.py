@@ -12,7 +12,9 @@ from telegram.ext import (filters, MessageHandler, ApplicationBuilder,
 
 from get_backend_response import (get_command_response,
                                   get_message_response,
-                                  get_location_response)
+                                  get_location_response,
+                                  get_user,
+                                  post_user)
 
 load_dotenv()
 
@@ -20,10 +22,38 @@ TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text='Im a bot, please talk to me!'
-    )
+    chat_id = update.message.chat_id
+    text = await get_user(chat_id)
+    if 'error' in text:
+        user = update.message.from_user
+        user_id = user.id
+        username = user.username
+        first_name = user.first_name
+        last_name = user.last_name
+        language_code = user.language_code
+        is_bot = user.is_bot
+        await post_user(
+            chat_id=user_id,
+            username=username,
+            first_name=first_name,
+            last_name=last_name,
+            language_code=language_code,
+            is_bot=is_bot)
+        text = (
+            'Привет! Ты тут в первый раз!\n'
+            'Ты так рано что у нас ещё нет инструкции для тебя!\n'
+            'Сорян придется тыкать пальчиками самому!'
+                )
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=text
+            )
+    else:
+        text = 'Рад снова тебя видеть!'
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=text
+        )
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -43,6 +43,46 @@ async def get_location_response(chat_id: str, latitude: str, longitude: str):
         return {'error': 'Failed to get the response'}
 
 
+async def get_user(chat_id: str):
+    url = f'http://0.0.0.0:8000/users/{chat_id}'
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url)
+
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return {'error': 'Failed to get the response'}
+
+
+async def post_user(
+        chat_id: str,
+        username: str,
+        first_name: str,
+        last_name: str,
+        language_code: str,
+        is_bot: bool):
+
+    url = 'http://0.0.0.0:8000/users/'
+
+    data = {
+        'chat_id': chat_id,
+        'username': username,
+        'first_name': first_name,
+        'last_name': last_name,
+        'language_code': language_code,
+        'is_bot': is_bot
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(url, json=data)
+
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return {'error': 'Failed to get the response'}
+
+
 # Пример использования
 async def main():
     command = 'some_command'
