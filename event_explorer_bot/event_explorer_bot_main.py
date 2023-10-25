@@ -2,7 +2,8 @@ import os
 from dotenv import load_dotenv
 import logging
 import re
-
+from datetime import datetime, timedelta
+import random
 
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.constants import ParseMode
@@ -14,11 +15,39 @@ from get_backend_response import (get_command_response,
                                   get_message_response,
                                   get_location_response,
                                   get_user,
-                                  post_user)
+                                  post_user,
+                                  post_event)
 
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+
+emoji_list = ["😄", "🎉", "🥳", "🎈", "🌟", "🎁", "🎂", "🍾", "🎊", "🥂",
+              "🤩", "🍰", "🎆", "🎇", "🎗️", "🎀", "🧨", "🪅", "🎵", "🎷",
+              "🎸", "🎶", "🍸", "🍹", "🍻", "🕺", "💃", "🕶️", "📸", "🌈"]
+
+names_list = [
+    "Шоколадный дождь",
+    "Пылесос для животных",
+    "Танцующий брокколи",
+    "Мороженое с мороженым",
+    "Кот в шляпе",
+    "Спящий бульдог",
+    "Ракета-тостер",
+    "Слон в пижаме",
+    "Змея-акробат",
+    "Грозный пушистик",
+    "Пингвин-гитарист",
+    "Заблудившийся ананас",
+    "Веселый огурчик",
+    "Летающая капуста",
+    "Хоровой единорог",
+    "Колдующий крокодил",
+    "Магический морской единорог",
+    "Шарик-воздушный шар",
+    "Смешанный омлет",
+    "Робот-подсолнух"
+]
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -80,6 +109,7 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for element in response:
         if element['tags'].get('name'):
             element_id = element['id']
+            events = element.get('events')
 
             amenity = element['tags'].get('amenity')
             name = element['tags'].get(
@@ -117,8 +147,7 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if contact_website:
                 text += f'\n{contact_website}'
 
-            keyboard = InlineKeyboardMarkup(
-                [
+            buttons = [
                     [InlineKeyboardButton(
                         'Смотреть на карте',
                         callback_data=(f'b1|{element_id}|'
@@ -127,7 +156,46 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                        f'{response_lon}')
                         )],
                 ]
-            )
+
+            if events:
+                text += f'\n\n<b>Найдено {len(events)} событий:</b>'
+                for event in events:
+                    time_obj_start = datetime.fromisoformat(
+                        event.get('start_datetime'))
+                    time_obj_end = datetime.fromisoformat(
+                        event.get('end_datetime'))
+
+                    event_wnen = time_obj_start.strftime('%d/%m/%Y')
+                    event_id = event.get('id')
+                    event_name = event.get('name')
+                    event_description = event.get('description')
+                    # event_user_id = event.get('user_id')
+                    event_telegram_username = f'@{event.get("telegram_username")}' if event.get('telegram_username') is not (None or '') else 'Безымянный Джо'
+                    event_start = time_obj_start.strftime('%H:%M')
+                    event_end = time_obj_end.strftime('%H:%M')
+
+                    random_emoji = random.choice(emoji_list)
+
+                    text += f'\n{random_emoji}'
+                    text += f'\nКогда: {event_wnen}'
+                    text += f'\nНазвание: {event_name}'
+                    if event_description:
+                        text += f'\nОписание: {event_description}'
+                    text += f'\nОрганизует: {event_telegram_username}'
+                    text += f'\nНачало: {event_start}'
+                    text += f'\nКонец: {event_end}'
+
+                    event_button = [InlineKeyboardButton(
+                        f'пойду к {event_telegram_username} на {event_name}',
+                        callback_data=(
+                            f'b4|'
+                            f'{event_id}'
+                            )
+                        )
+                        ]
+                    buttons.append(event_button)
+
+            keyboard = InlineKeyboardMarkup(buttons)
 
             try:
                 await context.bot.send_message(
@@ -206,9 +274,22 @@ async def b2(update: Update, context: CallbackContext):
 
     element_id = callback_data_parts[1]
 
+    start_datetime = datetime.now()
+    end_datetime = start_datetime + timedelta(hours=3)
+
+    random_name = random.choice(names_list)
+
+    await post_event(
+        name=random_name,
+        description='',
+        chat_id=str(chat_id),
+        place_id=element_id,
+        start_datetime=start_datetime.isoformat(),
+        end_datetime=end_datetime.isoformat())
+
     await context.bot.send_message(
         chat_id,
-        f'Тут событие будет создаваться автоматически для id = {element_id}')
+        'Событие создано!')
 
 
 async def b3(update: Update, context: CallbackContext):
@@ -222,6 +303,19 @@ async def b3(update: Update, context: CallbackContext):
     await context.bot.send_message(
         chat_id,
         f'Тут будет модуль подробного созданиясобытия для id = {element_id}')
+
+
+async def b4(update: Update, context: CallbackContext):
+    query = update.callback_query
+    chat_id = query.from_user.id
+
+    callback_data_parts = update.callback_query.data.split("|")
+
+    event_id = callback_data_parts[1]
+
+    await context.bot.send_message(
+        chat_id,
+        f'пользователь {chat_id} подписывается на событие {event_id}')
 
 
 def main():
@@ -243,6 +337,7 @@ def main():
     application.add_handler(CallbackQueryHandler(b1, pattern="b1"))
     application.add_handler(CallbackQueryHandler(b2, pattern="b2"))
     application.add_handler(CallbackQueryHandler(b3, pattern="b3"))
+    application.add_handler(CallbackQueryHandler(b4, pattern="b4"))
 
     application.run_polling()
 

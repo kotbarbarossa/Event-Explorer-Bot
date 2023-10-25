@@ -83,7 +83,34 @@ async def post_user(
         return {'error': 'Failed to get the response'}
 
 
-# Пример использования
+async def post_event(
+        name: str,
+        description: str,
+        chat_id: str,
+        place_id: str,
+        start_datetime: str,
+        end_datetime: str):
+
+    url = 'http://0.0.0.0:8000/events/'
+
+    data = {
+        'name': name,
+        'description': description,
+        'chat_id': chat_id,
+        'place_id': place_id,
+        'start_datetime': start_datetime,
+        'end_datetime': end_datetime
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(url, json=data)
+
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return {'error': 'Failed to get the response'}
+
+
 async def main():
     command = 'some_command'
     result = await get_command_response(command)
