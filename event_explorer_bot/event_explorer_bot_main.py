@@ -16,21 +16,35 @@ from get_backend_response import (get_command_response,
                                   get_location_response,
                                   get_user,
                                   post_user,
-                                  post_event)
+                                  post_event,
+                                  post_event_subscription)
 
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 
-emoji_list = ["😄", "🎉", "🥳", "🎈", "🌟", "🎁", "🎂", "🍾", "🎊", "🥂",
-              "🤩", "🍰", "🎆", "🎇", "🎗️", "🎀", "🧨", "🪅", "🎵", "🎷",
-              "🎸", "🎶", "🍸", "🍹", "🍻", "🕺", "💃", "🕶️", "📸", "🌈"]
+emoji_list = ['😄', '🎉', '🥳', '🎈', '🌟', '🎁', '🎂', '🍾', '🎊', '🥂',
+              '🤩', '🍰', '🎆', '🎇', '🎗️', '🎀', '🧨', '🪅', '🎵', '🎷',
+              '🎸', '🎶', '🍸', '🍹', '🍻', '🕺', '💃', '🕶️', '📸', '🌈']
+
+
+emoji_professions_list = ['👮', '🕵️', '👷', '👩‍🚒', '👨‍🌾', '👩‍🍳', '👨‍🎓',
+                          '👩‍🏫', '👨‍🎤', '👩‍🎨', '👨‍🚀', '👩‍⚖️', '👨‍🦼', '👩‍🦯',
+                          '🧕', '🧙‍♂️', '🧛‍♀️', '🧝‍♂️', '🧞‍♀️', '🧜‍♂️', '🦸‍♀️',
+                          '🦹‍♂️', '🦺', '🤴', '👸', '🎅', '🧑‍🎓', '🧑‍🏫',
+                          '🧑‍🎤', '🧑‍🎨', '🧑‍🚀', '🧑‍⚖️', '🧑‍🦼', '🧑‍🦯', '🦰',
+                          '🦱', '🦳', '🦲', '👩‍⚕️', '👨‍⚕️', '👩‍🔬', '👨‍🔬',
+                          '👩‍💼', '👨‍💼', '👩‍🌾', '👨‍🌾', '👩‍🍳', '👨‍🍳', '👩‍🎤',
+                          '👨‍🎤', '👩‍🎨', '👨‍🎨', '👩‍🚀', '👨‍🚀', '👩‍⚖️', '👨‍⚖️',
+                          '👩‍🦯', '👨‍🦯', '🦫', '🦭', '🐈‍⬛', '🦮', '🦙',
+                          '🦥', '🦦', '🦨', '🦩']
+
 
 names_list = [
     "Шоколадный дождь",
     "Пылесос для животных",
     "Танцующий брокколи",
-    "Мороженое с мороженым",
+    "Мороженое с женым",
     "Кот в шляпе",
     "Спящий бульдог",
     "Ракета-тостер",
@@ -38,12 +52,12 @@ names_list = [
     "Змея-акробат",
     "Грозный пушистик",
     "Пингвин-гитарист",
-    "Заблудившийся ананас",
+    "Блудившийся ананас",
     "Веселый огурчик",
     "Летающая капуста",
     "Хоровой единорог",
     "Колдующий крокодил",
-    "Магический морской единорог",
+    "Морской единорог",
     "Шарик-воздушный шар",
     "Смешанный омлет",
     "Робот-подсолнух"
@@ -89,8 +103,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.message.chat_id
     message = update.message.text
     text = await get_message_response(message, chat_id)
-    response_text = f"{text}"
-    await context.bot.send_message(chat_id=chat_id, text=response_text)
+    await context.bot.send_message(chat_id=chat_id, text=text)
 
 
 async def handle_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -170,26 +183,43 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     event_name = event.get('name')
                     event_description = event.get('description')
                     # event_user_id = event.get('user_id')
-                    event_telegram_username = f'@{event.get("telegram_username")}' if event.get('telegram_username') is not (None or '') else 'Безымянный Джо'
+
+                    if event.get('telegram_username'):
+                        event_tg_username = f'@{event.get("telegram_username")}'
+                    else:
+                        event_tg_username = 'Безымянный Джо'
                     event_start = time_obj_start.strftime('%H:%M')
                     event_end = time_obj_end.strftime('%H:%M')
+                    event_participants = event.get('event_participants')
 
-                    random_emoji = random.choice(emoji_list)
+                    emoji_one = random.choice(emoji_list)
+                    emoji_two = random.choice(emoji_list)
+                    emoji_three = random.choice(emoji_list)
 
-                    text += f'\n{random_emoji}'
+                    text += f'\n{emoji_one}{emoji_two}{emoji_three}'
                     text += f'\nКогда: {event_wnen}'
                     text += f'\nНазвание: {event_name}'
                     if event_description:
                         text += f'\nОписание: {event_description}'
-                    text += f'\nОрганизует: {event_telegram_username}'
+                    text += f'\nОрганизует: {event_tg_username}'
                     text += f'\nНачало: {event_start}'
                     text += f'\nКонец: {event_end}'
-
+                    if event_participants:
+                        text += '\nУчастники: '
+                        for user in event_participants:
+                            if user.get('telegram_username'):
+                                tg_username = f'@{user.get("telegram_username")}'
+                            else:
+                                tg_username = 'Безымянный Джо'
+                            text += f'\n{random.choice(emoji_list)} '
+                            text += f'{tg_username}'
+                    text += '\n'
                     event_button = [InlineKeyboardButton(
-                        f'пойду к {event_telegram_username} на {event_name}',
+                        f'пойду к {event_tg_username} на {event_name}',
                         callback_data=(
                             f'b4|'
-                            f'{event_id}'
+                            f'{event_id}|'
+                            f'{event_name}'
                             )
                         )
                         ]
@@ -307,15 +337,16 @@ async def b3(update: Update, context: CallbackContext):
 
 async def b4(update: Update, context: CallbackContext):
     query = update.callback_query
-    chat_id = query.from_user.id
+    chat_id = str(query.from_user.id)
 
     callback_data_parts = update.callback_query.data.split("|")
 
-    event_id = callback_data_parts[1]
-
+    event_id = int(callback_data_parts[1])
+    event_name = callback_data_parts[2]
+    await post_event_subscription(chat_id=chat_id, event_id=event_id)
     await context.bot.send_message(
         chat_id,
-        f'пользователь {chat_id} подписывается на событие {event_id}')
+        f'Участие в {event_name} подтверждено')
 
 
 def main():
