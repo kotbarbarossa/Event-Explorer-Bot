@@ -9,7 +9,7 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.constants import ParseMode
 from telegram.ext import (filters, MessageHandler, ApplicationBuilder,
                           CommandHandler, ContextTypes, CallbackContext,
-                          CallbackQueryHandler)
+                          CallbackQueryHandler, ConversationHandler,)
 
 from get_backend_response import (get_command_response,
                                   get_message_response,
@@ -39,6 +39,7 @@ emoji_professions_list = ['👮', '🕵️', '👷', '👩‍🚒', '👨‍🌾
                           '👩‍🦯', '👨‍🦯', '🦫', '🦭', '🐈‍⬛', '🦮', '🦙',
                           '🦥', '🦦', '🦨', '🦩']
 
+NAME, DESCRIPTION, DATE, TIME, DURATION = range(5)
 
 names_list = [
     "Шоколадный дождь",
@@ -185,7 +186,8 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     # event_user_id = event.get('user_id')
 
                     if event.get('telegram_username'):
-                        event_tg_username = f'@{event.get("telegram_username")}'
+                        event_tg_username = (
+                            f'@{event.get("telegram_username")}')
                     else:
                         event_tg_username = 'Безымянный Джо'
                     event_start = time_obj_start.strftime('%H:%M')
@@ -208,7 +210,8 @@ async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         text += '\nУчастники: '
                         for user in event_participants:
                             if user.get('telegram_username'):
-                                tg_username = f'@{user.get("telegram_username")}'
+                                tg_username = (
+                                    f'@{user.get("telegram_username")}')
                             else:
                                 tg_username = 'Безымянный Джо'
                             text += f'\n{random.choice(emoji_list)} '
@@ -283,17 +286,24 @@ async def b1(update: Update, context: CallbackContext):
                 "Пойду сейчас",
                 callback_data=f'b2|{element_id}'
                 )],
-            [InlineKeyboardButton(
-                "Создам событие на потом",
-                callback_data=f'b3|{element_id}'
-                )],
+            # [InlineKeyboardButton(
+            #     "Создам событие на потом",
+            #     callback_data=f'b3|{element_id}|{name}'
+            #     )],
         ]
     )
     await context.bot.send_location(
         chat_id=chat_id,
         latitude=latitude,
         longitude=longitude,
-        reply_markup=keyboard,)
+        reply_markup=keyboard,
+        )
+    await context.bot.send_message(
+        chat_id,
+        f'Чтобы создать событие с параметрами жми сюда {emoji} '
+        f'\n/create_event_place_{element_id}',
+        # reply_markup=keyboard,
+        )
 
 
 async def b2(update: Update, context: CallbackContext):
@@ -322,17 +332,18 @@ async def b2(update: Update, context: CallbackContext):
         'Событие создано!')
 
 
-async def b3(update: Update, context: CallbackContext):
-    query = update.callback_query
-    chat_id = query.from_user.id
+# async def b3(update: Update, context: CallbackContext):
+#     query = update.callback_query
+#     chat_id = query.from_user.id
 
-    callback_data_parts = update.callback_query.data.split("|")
+#     callback_data_parts = update.callback_query.data.split("|")
 
-    element_id = callback_data_parts[1]
+#     element_id = callback_data_parts[1]
+#     element_name = callback_data_parts[2]
 
-    await context.bot.send_message(
-        chat_id,
-        f'Тут будет модуль подробного созданиясобытия для id = {element_id}')
+#     await create_event_place(update, context, element_id=element_id)
+#     await context.bot.send_message(
+#         chat_id, f'/create_event_location {element_id}')
 
 
 async def b4(update: Update, context: CallbackContext):
@@ -349,28 +360,184 @@ async def b4(update: Update, context: CallbackContext):
         f'Участие в {event_name} подтверждено')
 
 
+async def create_event_place(update: Update, context: CallbackContext):
+    message_text = update.message.text
+    match = re.match(r'^/create_event_place_(\d+)', message_text)
+
+    if match:
+        place_id = match.group(1)
+        context.user_data['event'] = {}
+        context.user_data['event']['place_id'] = place_id
+        context.user_data['event']['chat_id'] = str(
+            update.message.from_user.id)
+
+        await update.message.reply_text('Введи название события:')
+        return NAME
+    else:
+        update.message.reply_text(
+            'Неверный формат команды. '
+            'Используйте /create_event_place_<place_id>')
+        return ConversationHandler.END
+
+
+async def name(update: Update, context: CallbackContext):
+    text = update.message.text
+    match = re.match(r'^[a-zA-Zа-яА-Я]{1,25}$', text)
+    if not match:
+        await update.message.reply_text(
+            'Нет такое имя не пойдет!'
+            '\nТолько буквы. Не больше 25 символов!'
+            '\nПопробуй ещё разок дружок пирожок:')
+        return NAME
+    context.user_data['event']['name'] = text
+    chat_id = update.effective_chat.id
+    await context.bot.send_message(chat_id, 'Введи описание события:')
+    return DESCRIPTION
+
+
+async def description(update: Update, context: CallbackContext):
+    text = update.message.text
+    match = re.match(r'^[a-zA-Zа-яА-Я]{1,25}$', text)
+    if not match:
+        await update.message.reply_text(
+            'Нет такое описание не пойдет!'
+            '\nТолько буквы. Не больше 25 символов!'
+            '\nПопробуй ещё разок дружок пирожок:')
+        return DESCRIPTION
+    context.user_data['event']['description'] = text
+    chat_id = update.effective_chat.id
+    await context.bot.send_message(chat_id, 'Введи дату события (дд-мм-гггг):')
+    return DATE
+
+
+async def is_valid_date(date_str):
+    try:
+        datetime.strptime(date_str, '%d-%m-%Y')
+        return True
+    except ValueError:
+        return False
+
+
+async def date(update: Update, context: CallbackContext):
+    text = update.message.text
+    if not await is_valid_date(text):
+        await update.message.reply_text(
+            'Нет такая дата не пойдет!'
+            '\nТолько такой формат -> дд-мм-гггг!'
+            '\nПопробуй ещё разок дружок пирожок:')
+        return DATE
+    context.user_data['event']['date'] = text
+    chat_id = update.effective_chat.id
+    await context.bot.send_message(chat_id, 'Введи время начала (чч:мм):')
+    return TIME
+
+
+async def is_valid_time(time_str):
+    try:
+        datetime.strptime(time_str, '%H:%M')
+        return True
+    except ValueError:
+        return False
+
+
+async def time(update: Update, context: CallbackContext):
+    text = update.message.text
+    if not await is_valid_time(text):
+        await update.message.reply_text(
+            'Нет такое время не пойдет!'
+            '\nТолько такой формат -> чч:мм!'
+            '\nПопробуй ещё разок дружок пирожок:')
+        return TIME
+    context.user_data['event']['time'] = text
+    chat_id = update.effective_chat.id
+    await context.bot.send_message(chat_id, 'Введи длительность в часах:')
+    return DURATION
+
+
+async def duration(update: Update, context: CallbackContext):
+    duration = update.message.text
+    try:
+        duration = int(duration)
+        if 0 < duration <= 12:
+            pass
+        else:
+            await update.message.reply_text(
+                'Ни куда не годится!'
+                '\nНе больше 12 часов!'
+                '\nПопробуй ещё разок дружок пирожок:')
+            return DURATION
+    except ValueError:
+        await update.message.reply_text(
+            'Ни куда не годится!'
+            '\nТолько цифра!'
+            '\nПопробуй ещё разок дружок пирожок:')
+        return DURATION
+
+    event = context.user_data["event"]
+    date_str = f'{event["date"]} {event["time"]}:00.123000'
+    start_datetime = datetime.strptime(date_str, '%d-%m-%Y %H:%M:%S.%f')
+
+    end_datetime = start_datetime + timedelta(hours=duration)
+    event['start_datetime'] = start_datetime.isoformat()
+    event['end_datetime'] = end_datetime.isoformat()
+
+    await post_event(
+        name=event['name'],
+        description=event['description'],
+        chat_id=event['chat_id'],
+        place_id=event['place_id'],
+        start_datetime=event['start_datetime'],
+        end_datetime=event['end_datetime']
+        )
+
+    context.user_data.clear()
+    await update.message.reply_text('Событие создано!')
+
+    return ConversationHandler.END
+
+
 def main():
     """Основная логика работы бота."""
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
     application.add_handler(CommandHandler('start', start))
 
+    location_handler = MessageHandler(filters.LOCATION, handle_location)
+    application.add_handler(location_handler)
+
+    application.add_handler(CallbackQueryHandler(b1, pattern="b1"))
+    application.add_handler(CallbackQueryHandler(b2, pattern="b2"))
+    # application.add_handler(CallbackQueryHandler(b3, pattern="b3"))
+    application.add_handler(CallbackQueryHandler(b4, pattern="b4"))
+
+    conversation_handler = ConversationHandler(
+        entry_points=[MessageHandler(
+            filters.TEXT & filters.Regex(
+                r'^/create_event_place_\d+'), create_event_place)],
+        states={
+            NAME: [MessageHandler(
+                filters.TEXT & (~filters.COMMAND), name)],
+            DESCRIPTION: [MessageHandler(
+                filters.TEXT & (~filters.COMMAND), description)],
+            DATE: [MessageHandler(
+                filters.TEXT & (~filters.COMMAND), date)],
+            TIME: [MessageHandler(
+                filters.TEXT & (~filters.COMMAND), time)],
+            DURATION: [MessageHandler(
+                filters.TEXT & (~filters.COMMAND), duration)],
+        },
+        fallbacks=[]
+    )
+    application.add_handler(conversation_handler)
+
     echo_handler = MessageHandler(
         filters.TEXT & (~filters.COMMAND), handle_message)
     application.add_handler(echo_handler)
 
-    location_handler = MessageHandler(filters.LOCATION, handle_location)
-    application.add_handler(location_handler)
-
     unknown_handler = MessageHandler(filters.COMMAND, handle_command)
     application.add_handler(unknown_handler)
 
-    application.add_handler(CallbackQueryHandler(b1, pattern="b1"))
-    application.add_handler(CallbackQueryHandler(b2, pattern="b2"))
-    application.add_handler(CallbackQueryHandler(b3, pattern="b3"))
-    application.add_handler(CallbackQueryHandler(b4, pattern="b4"))
-
-    application.run_polling()
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == '__main__':
