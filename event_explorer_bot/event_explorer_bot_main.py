@@ -70,11 +70,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = await get_user(chat_id)
     if 'error' in text:
         user = update.message.from_user
-        user_id = user.id
-        username = user.username
-        first_name = user.first_name
-        last_name = user.last_name
-        language_code = user.language_code
+        user_id = str(user.id)
+        username = user.username if hasattr(user, 'username') else ''
+        first_name = user.first_name if hasattr(user, 'first_name') else ''
+        last_name = user.last_name if hasattr(user, 'last_name') else ''
+        language_code = user.language_code if hasattr(
+            user, 'language_code') else ''
         is_bot = user.is_bot
         await post_user(
             chat_id=user_id,
