@@ -94,6 +94,21 @@ async def post_event_subscription(chat_id: str, event_id: int):
     return await get_response(endpoint=endpoint, data=data)
 
 
+async def post_place_subscription(chat_id: str, place_id: str):
+    endpoint = '/places/subscription/'
+    data = {
+        'chat_id': chat_id,
+        'place_id': place_id,
+    }
+    return await get_response(endpoint=endpoint, data=data)
+
+
+async def get_place_subscription(chat_id: str):
+    endpoint = f'/users/places_subscription/{chat_id}'
+    response = await get_response(endpoint=endpoint)
+    return response['response']
+
+
 async def main():
     command = 'some_command'
     result = await get_command_response(command)

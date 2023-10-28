@@ -5,7 +5,8 @@ import re
 from datetime import datetime, timedelta
 import random
 
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import (Update, InlineKeyboardMarkup, InlineKeyboardButton,
+                      ReplyKeyboardMarkup)
 from telegram.constants import ParseMode
 from telegram.ext import (filters, MessageHandler, ApplicationBuilder,
                           CommandHandler, ContextTypes, CallbackContext,
@@ -17,7 +18,9 @@ from get_backend_response import (get_command_response,
                                   get_user,
                                   post_user,
                                   post_event,
-                                  post_event_subscription)
+                                  post_event_subscription,
+                                  get_place_subscription,
+                                  post_place_subscription)
 
 load_dotenv()
 
@@ -64,10 +67,17 @@ names_list = [
     "Робот-подсолнух"
 ]
 
+buttons = [
+    ['🌟 Избранные места 🌟'],
+    ['Тыкнуть бота']
+]
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.message.chat_id
     text = await get_user(chat_id)
+    reply_markup = ReplyKeyboardMarkup(buttons, resize_keyboard=True)
+
     if 'error' in text:
         user = update.message.from_user
         user_id = str(user.id)
@@ -91,21 +101,31 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text=text
+            text=text,
+            reply_markup=reply_markup
             )
     else:
         text = 'Рад снова тебя видеть!'
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text=text
+            text=text,
+            reply_markup=reply_markup
         )
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.message.chat_id
     message = update.message.text
-    text = await get_message_response(message, chat_id)
-    await context.bot.send_message(chat_id=chat_id, text=text)
+
+    messages = {
+        '🌟 Избранные места 🌟': user_favotite_places,
+        'Тыкнуть бота': start,
+    }
+    if message not in messages:
+        text = await get_message_response(message, chat_id)
+        await context.bot.send_message(chat_id=chat_id, text=text)
+    else:
+        await messages[message](update, context)
 
 
 async def handle_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -115,12 +135,16 @@ async def handle_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
 
 
-async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_location(
+        update: Update, context: ContextTypes.DEFAULT_TYPE, **kwargs):
     chat_id = update.effective_chat.id
-    latitude = update.message.location.latitude
-    longitude = update.message.location.longitude
-
-    response = await get_location_response(chat_id, latitude, longitude)
+    favorite = kwargs.get('favorite')
+    if favorite:
+        response = await get_place_subscription(chat_id)
+    else:
+        latitude = update.message.location.latitude
+        longitude = update.message.location.longitude
+        response = await get_location_response(chat_id, latitude, longitude)
     for element in response:
         if element['tags'].get('name'):
             element_id = element['id']
@@ -287,10 +311,10 @@ async def b1(update: Update, context: CallbackContext):
                 "Пойду сейчас",
                 callback_data=f'b2|{element_id}'
                 )],
-            # [InlineKeyboardButton(
-            #     "Создам событие на потом",
-            #     callback_data=f'b3|{element_id}|{name}'
-            #     )],
+            [InlineKeyboardButton(
+                "Добавить место в избранное",
+                callback_data=f'b3|{element_id}|{name}'
+                )],
         ]
     )
     await context.bot.send_location(
@@ -333,18 +357,19 @@ async def b2(update: Update, context: CallbackContext):
         'Событие создано!')
 
 
-# async def b3(update: Update, context: CallbackContext):
-#     query = update.callback_query
-#     chat_id = query.from_user.id
+async def b3(update: Update, context: CallbackContext):
+    query = update.callback_query
+    chat_id = query.from_user.id
 
-#     callback_data_parts = update.callback_query.data.split("|")
+    callback_data_parts = update.callback_query.data.split("|")
 
-#     element_id = callback_data_parts[1]
-#     element_name = callback_data_parts[2]
+    element_id = callback_data_parts[1]
+    element_name = callback_data_parts[2]
 
-#     await create_event_place(update, context, element_id=element_id)
-#     await context.bot.send_message(
-#         chat_id, f'/create_event_location {element_id}')
+    await post_place_subscription(
+        chat_id=str(chat_id), place_id=str(element_id))
+    await context.bot.send_message(
+        chat_id, f'{element_name} добавлено в избранное!')
 
 
 async def b4(update: Update, context: CallbackContext):
@@ -497,6 +522,11 @@ async def duration(update: Update, context: CallbackContext):
     return ConversationHandler.END
 
 
+async def user_favotite_places(
+        update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await handle_location(update, context, favorite='favorite')
+
+
 def main():
     """Основная логика работы бота."""
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
@@ -508,7 +538,7 @@ def main():
 
     application.add_handler(CallbackQueryHandler(b1, pattern="b1"))
     application.add_handler(CallbackQueryHandler(b2, pattern="b2"))
-    # application.add_handler(CallbackQueryHandler(b3, pattern="b3"))
+    application.add_handler(CallbackQueryHandler(b3, pattern="b3"))
     application.add_handler(CallbackQueryHandler(b4, pattern="b4"))
 
     conversation_handler = ConversationHandler(
