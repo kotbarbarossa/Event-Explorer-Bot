@@ -7,11 +7,14 @@ base_url = 'http://0.0.0.0:8000'
 async def get_response(*args, **kwargs):
     endpoint = kwargs.get('endpoint')
     data = kwargs.get('data')
+    method = kwargs.get('method')
     url = base_url + endpoint
 
     async with httpx.AsyncClient() as client:
-        if data:
+        if method == 'post':
             response = await client.post(url, json=data)
+        elif method == 'delete':
+            response = await client.delete(url)
         else:
             response = await client.get(url)
 
@@ -101,6 +104,11 @@ async def post_place_subscription(chat_id: str, place_id: str):
         'place_id': place_id,
     }
     return await get_response(endpoint=endpoint, data=data)
+
+
+async def delete_place_subscription(chat_id: str, place_id: str):
+    endpoint = f'/places/subscription/?chat_id={chat_id}&place_id={place_id}'
+    return await get_response(endpoint=endpoint, method='delete')
 
 
 async def get_place_subscription(chat_id: str):

@@ -20,7 +20,8 @@ from get_backend_response import (get_command_response,
                                   post_event,
                                   post_event_subscription,
                                   get_place_subscription,
-                                  post_place_subscription)
+                                  post_place_subscription,
+                                  delete_place_subscription)
 
 load_dotenv()
 
@@ -139,6 +140,7 @@ async def handle_location(
         update: Update, context: ContextTypes.DEFAULT_TYPE, **kwargs):
     chat_id = update.effective_chat.id
     favorite = kwargs.get('favorite')
+
     if favorite:
         response = await get_place_subscription(chat_id)
     else:
@@ -192,7 +194,8 @@ async def handle_location(
                         callback_data=(f'b1|{element_id}|'
                                        f'{name}|'
                                        f'{response_lat}|'
-                                       f'{response_lon}')
+                                       f'{response_lon}|'
+                                       f'{favorite}')
                         )],
                 ]
 
@@ -297,8 +300,20 @@ async def b1(update: Update, context: CallbackContext):
     name = callback_data[2]
     latitude = callback_data[3]
     longitude = callback_data[4]
+    favorite = callback_data[5]
     emoji = "⬇"
     text = f'Чтобы узнать маршрут\nдо <b>{name}</b>\nнажми на карту {emoji}.'
+
+    if favorite == 'yes':
+        button = [InlineKeyboardButton(
+            "Удалить из избранного",
+            callback_data=f'b5|{element_id}|{name}'
+            )]
+    else:
+        button = [InlineKeyboardButton(
+            "Добавить место в избранное",
+            callback_data=f'b3|{element_id}|{name}'
+            )]
 
     await context.bot.send_message(
         chat_id=chat_id,
@@ -311,10 +326,7 @@ async def b1(update: Update, context: CallbackContext):
                 "Пойду сейчас",
                 callback_data=f'b2|{element_id}'
                 )],
-            [InlineKeyboardButton(
-                "Добавить место в избранное",
-                callback_data=f'b3|{element_id}|{name}'
-                )],
+            button,
         ]
     )
     await context.bot.send_location(
@@ -370,6 +382,21 @@ async def b3(update: Update, context: CallbackContext):
         chat_id=str(chat_id), place_id=str(element_id))
     await context.bot.send_message(
         chat_id, f'{element_name} добавлено в избранное!')
+
+
+async def b5(update: Update, context: CallbackContext):
+    query = update.callback_query
+    chat_id = query.from_user.id
+
+    callback_data_parts = update.callback_query.data.split("|")
+
+    element_id = callback_data_parts[1]
+    element_name = callback_data_parts[2]
+
+    await delete_place_subscription(
+        chat_id=str(chat_id), place_id=str(element_id))
+    await context.bot.send_message(
+        chat_id, f'{element_name} Удалено из избранного!')
 
 
 async def b4(update: Update, context: CallbackContext):
@@ -524,7 +551,7 @@ async def duration(update: Update, context: CallbackContext):
 
 async def user_favotite_places(
         update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await handle_location(update, context, favorite='favorite')
+    await handle_location(update, context, favorite='yes')
 
 
 def main():
@@ -540,6 +567,7 @@ def main():
     application.add_handler(CallbackQueryHandler(b2, pattern="b2"))
     application.add_handler(CallbackQueryHandler(b3, pattern="b3"))
     application.add_handler(CallbackQueryHandler(b4, pattern="b4"))
+    application.add_handler(CallbackQueryHandler(b5, pattern="b5"))
 
     conversation_handler = ConversationHandler(
         entry_points=[MessageHandler(
