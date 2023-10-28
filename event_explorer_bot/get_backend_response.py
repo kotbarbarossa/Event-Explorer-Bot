@@ -37,10 +37,18 @@ async def get_message_response(message: str, chat_id: str):
 
 
 async def get_location_response(chat_id: str, latitude: str, longitude: str):
-    endpoint = ('/location/?'
+    endpoint = ('/location/search/?'
                 f'chat_id={chat_id}&'
                 f'latitude={latitude}&'
                 f'longitude={longitude}')
+    response = await get_response(endpoint=endpoint)
+    return response['response']['elements']
+
+
+async def get_search_by_name_response(chat_id: str, place_name: str):
+    endpoint = ('/location/search/?'
+                f'chat_id={chat_id}&'
+                f'place_name={place_name}')
     response = await get_response(endpoint=endpoint)
     return response['response']['elements']
 
@@ -66,7 +74,7 @@ async def post_user(
         'language_code': language_code,
         'is_bot': is_bot
     }
-    return await get_response(endpoint=endpoint, data=data)
+    return await get_response(endpoint=endpoint, data=data, method='post')
 
 
 async def post_event(
@@ -85,7 +93,7 @@ async def post_event(
         'start_datetime': start_datetime,
         'end_datetime': end_datetime
     }
-    return await get_response(endpoint=endpoint, data=data)
+    return await get_response(endpoint=endpoint, data=data, method='post')
 
 
 async def post_event_subscription(chat_id: str, event_id: int):
@@ -94,7 +102,7 @@ async def post_event_subscription(chat_id: str, event_id: int):
         'chat_id': chat_id,
         'event_id': event_id,
     }
-    return await get_response(endpoint=endpoint, data=data)
+    return await get_response(endpoint=endpoint, data=data, method='post')
 
 
 async def post_place_subscription(chat_id: str, place_id: str):
@@ -103,7 +111,7 @@ async def post_place_subscription(chat_id: str, place_id: str):
         'chat_id': chat_id,
         'place_id': place_id,
     }
-    return await get_response(endpoint=endpoint, data=data)
+    return await get_response(endpoint=endpoint, data=data, method='post')
 
 
 async def delete_place_subscription(chat_id: str, place_id: str):
@@ -114,7 +122,7 @@ async def delete_place_subscription(chat_id: str, place_id: str):
 async def get_place_subscription(chat_id: str):
     endpoint = f'/users/places_subscription/{chat_id}'
     response = await get_response(endpoint=endpoint)
-    return response['response']
+    return response['response']['elements']
 
 
 async def main():

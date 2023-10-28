@@ -21,7 +21,8 @@ from get_backend_response import (get_command_response,
                                   post_event_subscription,
                                   get_place_subscription,
                                   post_place_subscription,
-                                  delete_place_subscription)
+                                  delete_place_subscription,
+                                  get_search_by_name_response)
 
 load_dotenv()
 
@@ -44,6 +45,7 @@ emoji_professions_list = ['👮', '🕵️', '👷', '👩‍🚒', '👨‍🌾
                           '🦥', '🦦', '🦨', '🦩']
 
 NAME, DESCRIPTION, DATE, TIME, DURATION = range(5)
+SEARCH_NAME = range(1)
 
 names_list = [
     "Шоколадный дождь",
@@ -70,6 +72,7 @@ names_list = [
 
 buttons = [
     ['🌟 Избранные места 🌟'],
+    ['Поиск'],
     ['Тыкнуть бота']
 ]
 
@@ -140,14 +143,22 @@ async def handle_location(
         update: Update, context: ContextTypes.DEFAULT_TYPE, **kwargs):
     chat_id = update.effective_chat.id
     favorite = kwargs.get('favorite')
+    search_data = kwargs.get('search_data')
 
     if favorite:
         response = await get_place_subscription(chat_id)
+    elif search_data:
+        response = await get_search_by_name_response(*search_data.values())
     else:
         latitude = update.message.location.latitude
         longitude = update.message.location.longitude
         response = await get_location_response(chat_id, latitude, longitude)
-    for element in response:
+    if not response:
+        return await context.bot.send_message(
+            chat_id,
+            'Ни чего не найдено 🤷‍♂️')
+    ELEMENT_LIMIT = 20
+    for element in response[:ELEMENT_LIMIT]:
         if element['tags'].get('name'):
             element_id = element['id']
             events = element.get('events')
@@ -554,6 +565,47 @@ async def user_favotite_places(
     await handle_location(update, context, favorite='yes')
 
 
+async def search_place(update: Update, context: CallbackContext):
+
+    context.user_data['search'] = {}
+    context.user_data['search']['chat_id'] = str(
+        update.message.from_user.id)
+
+    await update.message.reply_text(
+        'В целях безопасности поиск ограничен в выдаче.'
+        '\nВведи название заведения:')
+    return SEARCH_NAME
+
+
+async def search_name(update: Update, context: CallbackContext):
+    text = update.message.text
+    match = re.match(r'^\s*[a-zA-Zа-яА-Я\s]{1,25}\s*$', text)
+    if not match:
+        await update.message.reply_text(
+            'Нет такое имя не пойдет!'
+            '\nТолько буквы. Не больше 25 символов!'
+            '\nПопробуй ещё разок дружок пирожок:')
+        return SEARCH_NAME
+
+    search = context.user_data["search"]
+    search['place_name'] = text
+
+    search_data = {
+        'chat_id': search['chat_id'],
+        'place_name': search['place_name']
+    }
+
+    await handle_location(
+        update,
+        context,
+        search_data=search_data,
+        )
+
+    context.user_data.clear()
+
+    return ConversationHandler.END
+
+
 def main():
     """Основная логика работы бота."""
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
@@ -572,7 +624,7 @@ def main():
     conversation_handler = ConversationHandler(
         entry_points=[MessageHandler(
             filters.TEXT & filters.Regex(
-                r'^/create_event_place_\d+'), create_event_place)],
+                r'^create_event_place_\d+'), create_event_place)],
         states={
             NAME: [MessageHandler(
                 filters.TEXT & (~filters.COMMAND), name)],
@@ -588,6 +640,18 @@ def main():
         fallbacks=[]
     )
     application.add_handler(conversation_handler)
+
+    search_by_handler = ConversationHandler(
+        entry_points=[MessageHandler(
+            filters.TEXT & filters.Regex(
+                r'^Поиск'), search_place)],
+        states={
+            SEARCH_NAME: [MessageHandler(
+                filters.TEXT & (~filters.COMMAND), search_name)],
+        },
+        fallbacks=[]
+    )
+    application.add_handler(search_by_handler)
 
     echo_handler = MessageHandler(
         filters.TEXT & (~filters.COMMAND), handle_message)
