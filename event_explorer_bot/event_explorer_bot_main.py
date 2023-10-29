@@ -24,7 +24,9 @@ from get_backend_response import (get_command_response,
                                   delete_place_subscription,
                                   get_search_by_name_response,
                                   get_user_subscription,
-                                  delete_user_subscription)
+                                  delete_user_subscription,
+                                  get_place_detail_response,
+                                  post_user_subscription)
 
 load_dotenv()
 
@@ -205,9 +207,6 @@ async def handle_location(
                     [InlineKeyboardButton(
                         'Смотреть на карте',
                         callback_data=(f'b1|{element_id}|'
-                                       f'{name}|'
-                                       f'{response_lat}|'
-                                       f'{response_lon}|'
                                        f'{favorite}')
                         )],
                 ]
@@ -221,10 +220,8 @@ async def handle_location(
                         event.get('end_datetime'))
 
                     event_wnen = time_obj_start.strftime('%d/%m/%Y')
-                    event_id = event.get('id')
                     event_name = event.get('name')
                     event_description = event.get('description')
-                    # event_user_id = event.get('user_id')
 
                     if event.get('telegram_username'):
                         event_tg_username = (
@@ -258,16 +255,6 @@ async def handle_location(
                             text += f'\n{random.choice(EMOJI_LIST)} '
                             text += f'{tg_username}'
                     text += '\n'
-                    event_button = [InlineKeyboardButton(
-                        f'пойду к {event_tg_username} на {event_name}',
-                        callback_data=(
-                            f'b4|'
-                            f'{event_id}|'
-                            f'{event_name}'
-                            )
-                        )
-                        ]
-                    buttons.append(event_button)
 
             keyboard = InlineKeyboardMarkup(buttons)
 
@@ -310,12 +297,19 @@ async def b1(update: Update, context: CallbackContext):
     chat_id = query.from_user.id
     callback_data = query.data.split('|')
     element_id = callback_data[1]
-    name = callback_data[2]
-    latitude = callback_data[3]
-    longitude = callback_data[4]
-    favorite = callback_data[5]
+    favorite = callback_data[2]
     emoji = "⬇"
-    text = f'Чтобы узнать маршрут\nдо <b>{name}</b>\nнажми на карту {emoji}.'
+
+    place_detail = await get_place_detail_response(
+        telegram_id=chat_id, place_id=element_id)
+    latitude = place_detail['lat']
+    longitude = place_detail['lon']
+    name = place_detail['tags']['name']
+    events = place_detail.get('events')
+
+    text_location = ('Чтобы узнать маршрут'
+                     f'\nдо <b>{name}</b>'
+                     f'\nнажми на карту {emoji}.')
 
     if favorite == 'yes':
         button = [InlineKeyboardButton(
@@ -330,7 +324,7 @@ async def b1(update: Update, context: CallbackContext):
 
     await context.bot.send_message(
         chat_id=chat_id,
-        text=text,
+        text=text_location,
         parse_mode=ParseMode.HTML)
 
     keyboard = InlineKeyboardMarkup(
@@ -348,11 +342,89 @@ async def b1(update: Update, context: CallbackContext):
         longitude=longitude,
         reply_markup=keyboard,
         )
+
+    if events:
+        for event in events:
+            text = ''
+            subscription_id = event.get('user_id')
+            subscription_username = event.get('telegram_username')
+            time_obj_start = datetime.fromisoformat(
+                event.get('start_datetime'))
+            time_obj_end = datetime.fromisoformat(
+                event.get('end_datetime'))
+
+            event_wnen = time_obj_start.strftime('%d/%m/%Y')
+            event_id = event.get('id')
+            event_name = event.get('name')
+            event_description = event.get('description')
+
+            if event.get('telegram_username'):
+                event_tg_username = (
+                    f'@{event.get("telegram_username")}')
+            else:
+                event_tg_username = 'Безымянный Джо'
+            event_start = time_obj_start.strftime('%H:%M')
+            event_end = time_obj_end.strftime('%H:%M')
+            event_participants = event.get('event_participants')
+
+            emoji_one = random.choice(EMOJI_LIST)
+            emoji_two = random.choice(EMOJI_LIST)
+            emoji_three = random.choice(EMOJI_LIST)
+
+            text += f'\n{emoji_one}{emoji_two}{emoji_three}'
+            text += f'\nКогда: {event_wnen}'
+            text += f'\nНазвание: {event_name}'
+            if event_description:
+                text += f'\nОписание: {event_description}'
+            text += f'\nОрганизует: {event_tg_username}'
+            text += f'\nНачало: {event_start}'
+            text += f'\nКонец: {event_end}'
+            if event_participants:
+                text += '\nУчастники: '
+                for user in event_participants:
+                    if user.get('telegram_username'):
+                        tg_username = (
+                            f'@{user.get("telegram_username")}')
+                    else:
+                        tg_username = 'Безымянный Джо'
+                    text += f'\n{random.choice(EMOJI_LIST)} '
+                    text += f'{tg_username}'
+            text += '\n'
+            buttons = []
+            event_button = [InlineKeyboardButton(
+                        f'пойду к {event_tg_username} на {event_name}',
+                        callback_data=(
+                            f'b4|'
+                            f'{event_id}|'
+                            f'{event_name}'
+                            )
+                        )
+                        ]
+            buttons.append(event_button)
+            if subscription_username:
+                subscribe_button = [InlineKeyboardButton(
+                            f'Подписаться на {event_tg_username}',
+                            callback_data=(
+                                f'b7|'
+                                f'{subscription_id}|'
+                                f'{event_tg_username}'
+                                )
+                            )
+                            ]
+                buttons.append(subscribe_button)
+            keyboard = InlineKeyboardMarkup(buttons)
+
+            await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    reply_markup=keyboard,
+                    parse_mode=ParseMode.HTML
+                    )
+
     await context.bot.send_message(
         chat_id,
         f'Чтобы создать событие с параметрами жми сюда {emoji} '
         f'\n/create_event_place_{element_id}',
-        # reply_markup=keyboard,
         )
 
 
@@ -438,6 +510,20 @@ async def b6(update: Update, context: CallbackContext):
         telegram_id=str(telegram_id), subscription_id=str(subscription_id))
     await context.bot.send_message(
         telegram_id, f'Подписка на {subscription_id} удалена!')
+
+
+async def b7(update: Update, context: CallbackContext):
+    query = update.callback_query
+    telegram_id = query.from_user.id
+
+    callback_data_parts = update.callback_query.data.split("|")
+
+    subscription_id = callback_data_parts[1]
+    subscription_username = callback_data_parts[2]
+    await post_user_subscription(
+        telegram_id=str(telegram_id), subscription_id=str(subscription_id))
+    await context.bot.send_message(
+        telegram_id, f'Ты подписался на {subscription_username}!')
 
 
 async def create_event_place(update: Update, context: CallbackContext):
@@ -667,6 +753,7 @@ def main():
     application.add_handler(CallbackQueryHandler(b4, pattern="b4"))
     application.add_handler(CallbackQueryHandler(b5, pattern="b5"))
     application.add_handler(CallbackQueryHandler(b6, pattern="b6"))
+    application.add_handler(CallbackQueryHandler(b7, pattern="b7"))
 
     conversation_handler = ConversationHandler(
         entry_points=[MessageHandler(

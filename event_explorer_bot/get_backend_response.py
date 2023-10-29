@@ -128,6 +128,14 @@ async def get_place_subscription(telegram_id: str):
     return response['response']['elements']
 
 
+async def get_place_detail_response(telegram_id: str, place_id: str):
+    endpoint = f'/places/{place_id}/?telegram_id={telegram_id}'
+    response = await get_response(endpoint=endpoint)
+    if response.get('error'):
+        return None
+    return response['response']['elements'][0]
+
+
 async def get_user_subscription(telegram_id: str):
     endpoint = f'/users/{telegram_id}/subscription/'
     response = await get_response(endpoint=endpoint)
