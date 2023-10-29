@@ -94,7 +94,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user, 'language_code') else ''
         is_bot = user.is_bot
         await post_user(
-            chat_id=user_id,
+            telegram_id=user_id,
             username=username,
             first_name=first_name,
             last_name=last_name,
@@ -372,7 +372,7 @@ async def b2(update: Update, context: CallbackContext):
     await post_event(
         name=random_name,
         description='',
-        chat_id=str(chat_id),
+        telegram_id=str(chat_id),
         place_id=element_id,
         start_datetime=start_datetime.isoformat(),
         end_datetime=end_datetime.isoformat())
@@ -392,7 +392,7 @@ async def b3(update: Update, context: CallbackContext):
     element_name = callback_data_parts[2]
 
     await post_place_subscription(
-        chat_id=str(chat_id), place_id=str(element_id))
+        telegram_id=str(chat_id), place_id=str(element_id))
     await context.bot.send_message(
         chat_id, f'{element_name} добавлено в избранное!')
 
@@ -407,7 +407,7 @@ async def b5(update: Update, context: CallbackContext):
     element_name = callback_data_parts[2]
 
     await delete_place_subscription(
-        chat_id=str(chat_id), place_id=str(element_id))
+        telegram_id=str(chat_id), place_id=str(element_id))
     await context.bot.send_message(
         chat_id, f'{element_name} Удалено из избранного!')
 
@@ -420,7 +420,7 @@ async def b4(update: Update, context: CallbackContext):
 
     event_id = int(callback_data_parts[1])
     event_name = callback_data_parts[2]
-    await post_event_subscription(chat_id=chat_id, event_id=event_id)
+    await post_event_subscription(telegram_id=chat_id, event_id=event_id)
     await context.bot.send_message(
         chat_id,
         f'Участие в {event_name} подтверждено')
@@ -428,16 +428,16 @@ async def b4(update: Update, context: CallbackContext):
 
 async def b6(update: Update, context: CallbackContext):
     query = update.callback_query
-    chat_id = query.from_user.id
+    telegram_id = query.from_user.id
 
     callback_data_parts = update.callback_query.data.split("|")
 
-    user_telegram_id = callback_data_parts[1]
+    subscription_id = callback_data_parts[1]
 
     await delete_user_subscription(
-        chat_id=str(chat_id), telegram_id=str(user_telegram_id))
+        telegram_id=str(telegram_id), subscription_id=str(subscription_id))
     await context.bot.send_message(
-        chat_id, f'Подписка на {user_telegram_id} удалена!')
+        telegram_id, f'Подписка на {subscription_id} удалена!')
 
 
 async def create_event_place(update: Update, context: CallbackContext):
@@ -454,7 +454,7 @@ async def create_event_place(update: Update, context: CallbackContext):
         await update.message.reply_text('Введи название события:')
         return NAME
     else:
-        update.message.reply_text(
+        await update.message.reply_text(
             'Неверный формат команды. '
             'Используйте /create_event_place_<place_id>')
         return ConversationHandler.END
@@ -564,7 +564,7 @@ async def duration(update: Update, context: CallbackContext):
     await post_event(
         name=event['name'],
         description=event['description'],
-        chat_id=event['chat_id'],
+        telegram_id=event['chat_id'],
         place_id=event['place_id'],
         start_datetime=event['start_datetime'],
         end_datetime=event['end_datetime']
@@ -626,7 +626,7 @@ async def user_subscriptions(
         update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.message.chat_id
 
-    users = await get_user_subscription(chat_id=chat_id)
+    users = await get_user_subscription(telegram_id=chat_id)
 
     if not users:
         text = 'У вас пока нет подписок на пользователей'
@@ -671,7 +671,7 @@ def main():
     conversation_handler = ConversationHandler(
         entry_points=[MessageHandler(
             filters.TEXT & filters.Regex(
-                r'^create_event_place_\d+'), create_event_place)],
+                r'^/create_event_place_\d+'), create_event_place)],
         states={
             NAME: [MessageHandler(
                 filters.TEXT & (~filters.COMMAND), name)],
