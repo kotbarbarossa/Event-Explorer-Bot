@@ -37,7 +37,7 @@ async def get_message_response(message: str, chat_id: str):
 
 
 async def get_location_response(chat_id: str, latitude: str, longitude: str):
-    endpoint = ('/location/search/?'
+    endpoint = ('/location/?'
                 f'chat_id={chat_id}&'
                 f'latitude={latitude}&'
                 f'longitude={longitude}')
@@ -123,6 +123,19 @@ async def get_place_subscription(chat_id: str):
     endpoint = f'/users/places_subscription/{chat_id}'
     response = await get_response(endpoint=endpoint)
     return response['response']['elements']
+
+
+async def get_user_subscription(chat_id: str):
+    endpoint = f'/users/user_subscription/?chat_id={chat_id}'
+    response = await get_response(endpoint=endpoint)
+    return response['response']
+
+
+async def delete_user_subscription(chat_id: str, telegram_id: str):
+    endpoint = (f'/users/user_subscription/?'
+                f'chat_id={chat_id}&'
+                f'telegram_id={telegram_id}')
+    return await get_response(endpoint=endpoint, method='delete')
 
 
 async def main():

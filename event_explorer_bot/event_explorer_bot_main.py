@@ -22,18 +22,20 @@ from get_backend_response import (get_command_response,
                                   get_place_subscription,
                                   post_place_subscription,
                                   delete_place_subscription,
-                                  get_search_by_name_response)
+                                  get_search_by_name_response,
+                                  get_user_subscription,
+                                  delete_user_subscription)
 
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 
-emoji_list = ['😄', '🎉', '🥳', '🎈', '🌟', '🎁', '🎂', '🍾', '🎊', '🥂',
+EMOJI_LIST = ['😄', '🎉', '🥳', '🎈', '🌟', '🎁', '🎂', '🍾', '🎊', '🥂',
               '🤩', '🍰', '🎆', '🎇', '🎗️', '🎀', '🧨', '🪅', '🎵', '🎷',
               '🎸', '🎶', '🍸', '🍹', '🍻', '🕺', '💃', '🕶️', '📸', '🌈']
 
 
-emoji_professions_list = ['👮', '🕵️', '👷', '👩‍🚒', '👨‍🌾', '👩‍🍳', '👨‍🎓',
+EMOJI_PROFESSIONS_LIST = ['👮', '🕵️', '👷', '👩‍🚒', '👨‍🌾', '👩‍🍳', '👨‍🎓',
                           '👩‍🏫', '👨‍🎤', '👩‍🎨', '👨‍🚀', '👩‍⚖️', '👨‍🦼', '👩‍🦯',
                           '🧕', '🧙‍♂️', '🧛‍♀️', '🧝‍♂️', '🧞‍♀️', '🧜‍♂️', '🦸‍♀️',
                           '🦹‍♂️', '🦺', '🤴', '👸', '🎅', '🧑‍🎓', '🧑‍🏫',
@@ -47,7 +49,7 @@ emoji_professions_list = ['👮', '🕵️', '👷', '👩‍🚒', '👨‍🌾
 NAME, DESCRIPTION, DATE, TIME, DURATION = range(5)
 SEARCH_NAME = range(1)
 
-names_list = [
+EVENTS_NAMES = [
     "Шоколадный дождь",
     "Пылесос для животных",
     "Танцующий брокколи",
@@ -70,8 +72,8 @@ names_list = [
     "Робот-подсолнух"
 ]
 
-buttons = [
-    ['🌟 Избранные места 🌟'],
+BUTTONS = [
+    ['🌟 Избранное 🌟', '🕺 Подписки 🕺'],
     ['Поиск'],
     ['Тыкнуть бота']
 ]
@@ -80,7 +82,7 @@ buttons = [
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.message.chat_id
     text = await get_user(chat_id)
-    reply_markup = ReplyKeyboardMarkup(buttons, resize_keyboard=True)
+    reply_markup = ReplyKeyboardMarkup(BUTTONS, resize_keyboard=True)
 
     if 'error' in text:
         user = update.message.from_user
@@ -122,7 +124,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message.text
 
     messages = {
-        '🌟 Избранные места 🌟': user_favotite_places,
+        '🌟 Избранное 🌟': user_favotite_places,
         'Тыкнуть бота': start,
     }
     if message not in messages:
@@ -233,9 +235,9 @@ async def handle_location(
                     event_end = time_obj_end.strftime('%H:%M')
                     event_participants = event.get('event_participants')
 
-                    emoji_one = random.choice(emoji_list)
-                    emoji_two = random.choice(emoji_list)
-                    emoji_three = random.choice(emoji_list)
+                    emoji_one = random.choice(EMOJI_LIST)
+                    emoji_two = random.choice(EMOJI_LIST)
+                    emoji_three = random.choice(EMOJI_LIST)
 
                     text += f'\n{emoji_one}{emoji_two}{emoji_three}'
                     text += f'\nКогда: {event_wnen}'
@@ -253,7 +255,7 @@ async def handle_location(
                                     f'@{user.get("telegram_username")}')
                             else:
                                 tg_username = 'Безымянный Джо'
-                            text += f'\n{random.choice(emoji_list)} '
+                            text += f'\n{random.choice(EMOJI_LIST)} '
                             text += f'{tg_username}'
                     text += '\n'
                     event_button = [InlineKeyboardButton(
@@ -334,7 +336,7 @@ async def b1(update: Update, context: CallbackContext):
     keyboard = InlineKeyboardMarkup(
         [
             [InlineKeyboardButton(
-                "Пойду сейчас",
+                "Пойду сечас (свое событие)",
                 callback_data=f'b2|{element_id}'
                 )],
             button,
@@ -365,7 +367,7 @@ async def b2(update: Update, context: CallbackContext):
     start_datetime = datetime.now()
     end_datetime = start_datetime + timedelta(hours=3)
 
-    random_name = random.choice(names_list)
+    random_name = random.choice(EVENTS_NAMES)
 
     await post_event(
         name=random_name,
@@ -422,6 +424,20 @@ async def b4(update: Update, context: CallbackContext):
     await context.bot.send_message(
         chat_id,
         f'Участие в {event_name} подтверждено')
+
+
+async def b6(update: Update, context: CallbackContext):
+    query = update.callback_query
+    chat_id = query.from_user.id
+
+    callback_data_parts = update.callback_query.data.split("|")
+
+    user_telegram_id = callback_data_parts[1]
+
+    await delete_user_subscription(
+        chat_id=str(chat_id), telegram_id=str(user_telegram_id))
+    await context.bot.send_message(
+        chat_id, f'Подписка на {user_telegram_id} удалена!')
 
 
 async def create_event_place(update: Update, context: CallbackContext):
@@ -606,6 +622,31 @@ async def search_name(update: Update, context: CallbackContext):
     return ConversationHandler.END
 
 
+async def user_subscriptions(
+        update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.message.chat_id
+
+    users = await get_user_subscription(chat_id=chat_id)
+
+    if not users:
+        text = 'У вас пока нет подписок на пользователей'
+        return await context.bot.send_message(chat_id, text)
+    for user in users:
+        user_telegram_id = user['telegram_id']
+        telegram_username = user['telegram_username']
+        button = [InlineKeyboardButton(
+            "Удалить из избранного",
+            callback_data=f'b6|{user_telegram_id}'
+            )]
+        keyboard = InlineKeyboardMarkup([button])
+        text = f'@{telegram_username}'
+        return await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    reply_markup=keyboard,
+                    )
+
+
 def main():
     """Основная логика работы бота."""
     application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
@@ -615,11 +656,17 @@ def main():
     location_handler = MessageHandler(filters.LOCATION, handle_location)
     application.add_handler(location_handler)
 
+    user_subscription = MessageHandler(
+            filters.TEXT & filters.Regex(
+                r'🕺 Подписки 🕺'), user_subscriptions)
+    application.add_handler(user_subscription)
+
     application.add_handler(CallbackQueryHandler(b1, pattern="b1"))
     application.add_handler(CallbackQueryHandler(b2, pattern="b2"))
     application.add_handler(CallbackQueryHandler(b3, pattern="b3"))
     application.add_handler(CallbackQueryHandler(b4, pattern="b4"))
     application.add_handler(CallbackQueryHandler(b5, pattern="b5"))
+    application.add_handler(CallbackQueryHandler(b6, pattern="b6"))
 
     conversation_handler = ConversationHandler(
         entry_points=[MessageHandler(
