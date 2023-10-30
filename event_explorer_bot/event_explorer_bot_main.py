@@ -49,7 +49,7 @@ EMOJI_PROFESSIONS_LIST = ['👮', '🕵️', '👷', '👩‍🚒', '👨‍🌾
                           '🦥', '🦦', '🦨', '🦩']
 
 NAME, DESCRIPTION, DATE, TIME, DURATION = range(5)
-SEARCH_NAME = range(1)
+SEARCH_NAME, SEARCH_REGION_NAME = range(2)
 
 EVENTS_NAMES = [
     "Шоколадный дождь",
@@ -505,11 +505,12 @@ async def b6(update: Update, context: CallbackContext):
     callback_data_parts = update.callback_query.data.split("|")
 
     subscription_id = callback_data_parts[1]
+    telegram_username = callback_data_parts[2]
 
     await delete_user_subscription(
         telegram_id=str(telegram_id), subscription_id=str(subscription_id))
     await context.bot.send_message(
-        telegram_id, f'Подписка на {subscription_id} удалена!')
+        telegram_id, f'Подписка на {telegram_username} удалена!')
 
 
 async def b7(update: Update, context: CallbackContext):
@@ -690,10 +691,30 @@ async def search_name(update: Update, context: CallbackContext):
         return SEARCH_NAME
 
     search = context.user_data["search"]
+
     search['place_name'] = text
 
+    chat_id = update.effective_chat.id
+    await context.bot.send_message(
+        chat_id, 'Введи название региона или города или района:')
+    return SEARCH_REGION_NAME
+
+
+async def search_region_name(update: Update, context: CallbackContext):
+    text = update.message.text
+    match = re.match(r'^\s*[a-zA-Zа-яА-Я\s]{1,25}\s*$', text)
+    if not match:
+        await update.message.reply_text(
+            'Нет такое название не пойдет!'
+            '\nТолько буквы. Не больше 25 символов!'
+            '\nПопробуй ещё разок дружок пирожок:')
+        return SEARCH_REGION_NAME
+
+    search = context.user_data["search"]
+    search['region_name'] = text
     search_data = {
         'chat_id': search['chat_id'],
+        'region_name': search['region_name'],
         'place_name': search['place_name']
     }
 
@@ -722,7 +743,7 @@ async def user_subscriptions(
         telegram_username = user['telegram_username']
         button = [InlineKeyboardButton(
             "Удалить из избранного",
-            callback_data=f'b6|{user_telegram_id}'
+            callback_data=f'b6|{user_telegram_id}|{telegram_username}'
             )]
         keyboard = InlineKeyboardMarkup([button])
         text = f'@{telegram_username}'
@@ -782,6 +803,8 @@ def main():
         states={
             SEARCH_NAME: [MessageHandler(
                 filters.TEXT & (~filters.COMMAND), search_name)],
+            SEARCH_REGION_NAME: [MessageHandler(
+                filters.TEXT & (~filters.COMMAND), search_region_name)],
         },
         fallbacks=[]
     )

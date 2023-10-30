@@ -46,9 +46,11 @@ async def get_location_response(
     return response['response']['elements']
 
 
-async def get_search_by_name_response(telegram_id: str, place_name: str):
+async def get_search_by_name_response(
+        telegram_id: str, region_name: str, place_name: str):
     endpoint = ('/locations/search/?'
                 f'telegram_id={telegram_id}&'
+                f'region_name={region_name}&'
                 f'place_name={place_name}')
     response = await get_response(endpoint=endpoint)
     return response['response']['elements']
