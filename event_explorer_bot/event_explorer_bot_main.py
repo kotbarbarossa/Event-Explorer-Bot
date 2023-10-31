@@ -48,7 +48,14 @@ EMOJI_PROFESSIONS_LIST = ['👮', '🕵️', '👷', '👩‍🚒', '👨‍🌾
                           '👩‍🦯', '👨‍🦯', '🦫', '🦭', '🐈‍⬛', '🦮', '🦙',
                           '🦥', '🦦', '🦨', '🦩']
 
-NAME, DESCRIPTION, DATE, TIME, DURATION = range(5)
+[
+    EVENT_NAME,
+    EVENT_DESCRIPTION,
+    EVENT_DATE,
+    EVENT_TIME,
+    EVENT_DURATION
+] = range(5)
+
 SEARCH_NAME, SEARCH_REGION_NAME = range(2)
 
 EVENTS_NAMES = [
@@ -82,6 +89,7 @@ BUTTONS = [
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Функция инициализации бота."""
     chat_id = update.message.chat_id
     text = await get_user(chat_id)
     reply_markup = ReplyKeyboardMarkup(BUTTONS, resize_keyboard=True)
@@ -122,6 +130,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Функция обработки неизвестных боту сообщений."""
     chat_id = update.message.chat_id
     message = update.message.text
 
@@ -137,6 +146,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Функция обработки неизвестных боту команд."""
     command = update.message.text.replace('/', '')
     chat_id = update.effective_chat.id
     text = await get_command_response(command, chat_id)
@@ -144,7 +154,9 @@ async def handle_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_location(
-        update: Update, context: ContextTypes.DEFAULT_TYPE, **kwargs):
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE, **kwargs):
+    """Функция обработки сообщений типа 'локация'."""
     chat_id = update.effective_chat.id
     favorite = kwargs.get('favorite')
     search_data = kwargs.get('search_data')
@@ -179,9 +191,6 @@ async def handle_location(
             contact_vk = element['tags'].get('contact:vk')
             contact_website = element['tags'].get('contact:website')
 
-            response_lat = element['lat']
-            response_lon = element['lon']
-
             text = f'<b>{name}</b>'
 
             if amenity:
@@ -206,7 +215,7 @@ async def handle_location(
             buttons = [
                     [InlineKeyboardButton(
                         'Смотреть на карте',
-                        callback_data=(f'b1|{element_id}|'
+                        callback_data=(f'details_button|{element_id}|'
                                        f'{favorite}')
                         )],
                 ]
@@ -258,41 +267,20 @@ async def handle_location(
 
             keyboard = InlineKeyboardMarkup(buttons)
 
-            try:
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=text,
-                    reply_markup=keyboard,
-                    parse_mode=ParseMode.HTML
-                    )
-            except Exception:
-                cleaned_name = re.sub(r'[^a-zA-Zа-яА-Я]', '', name)
-
-                logging.critical(
-                    f'Функцией {handle_location.__name__} '
-                    f'получено глючное имя "{name}" .'
-                    f'Исправлено и передано в кнопку как "{cleaned_name}".')
-
-                keyboard = InlineKeyboardMarkup(
-                    [
-                        [InlineKeyboardButton(
-                            'Смотреть на карте',
-                            callback_data=(f'b1|{element_id}|'
-                                           f'{cleaned_name}|'
-                                           f'{response_lat}|'
-                                           f'{response_lon}')
-                            )],
-                    ]
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=text,
+                reply_markup=keyboard,
+                parse_mode=ParseMode.HTML
                 )
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=text,
-                    reply_markup=keyboard,
-                    parse_mode=ParseMode.HTML
-                    )
 
 
-async def b1(update: Update, context: CallbackContext):
+async def details_button(update: Update, context: CallbackContext):
+    """
+    Кнопка "Смотреть на карте" под сообщением с локацией.
+    Принимает id локации и параметр favorite.
+    При нажатии присылает локацию места и список событий если они есть.
+    """
     query = update.callback_query
     chat_id = query.from_user.id
     callback_data = query.data.split('|')
@@ -314,12 +302,12 @@ async def b1(update: Update, context: CallbackContext):
     if favorite == 'yes':
         button = [InlineKeyboardButton(
             "Удалить из избранного",
-            callback_data=f'b5|{element_id}|{name}'
+            callback_data=f'delete_favorite_button|{element_id}|{name}'
             )]
     else:
         button = [InlineKeyboardButton(
             "Добавить место в избранное",
-            callback_data=f'b3|{element_id}|{name}'
+            callback_data=f'add_favorite_button|{element_id}|{name}'
             )]
 
     await context.bot.send_message(
@@ -331,7 +319,7 @@ async def b1(update: Update, context: CallbackContext):
         [
             [InlineKeyboardButton(
                 "Пойду сечас (свое событие)",
-                callback_data=f'b2|{element_id}'
+                callback_data=f'create_fast_event_button|{element_id}'
                 )],
             button,
         ]
@@ -394,7 +382,7 @@ async def b1(update: Update, context: CallbackContext):
             event_button = [InlineKeyboardButton(
                         f'пойду к {event_tg_username} на {event_name}',
                         callback_data=(
-                            f'b4|'
+                            f'confirm_parti_button|'
                             f'{event_id}|'
                             f'{event_name}'
                             )
@@ -405,7 +393,7 @@ async def b1(update: Update, context: CallbackContext):
                 subscribe_button = [InlineKeyboardButton(
                             f'Подписаться на {event_tg_username}',
                             callback_data=(
-                                f'b7|'
+                                f'add_subscribe_button|'
                                 f'{subscription_id}|'
                                 f'{event_tg_username}'
                                 )
@@ -424,11 +412,16 @@ async def b1(update: Update, context: CallbackContext):
     await context.bot.send_message(
         chat_id,
         f'Чтобы создать событие с параметрами жми сюда {emoji} '
-        f'\n/create_event_place_{element_id}',
+        f'\n/create_event_{element_id}',
         )
 
 
-async def b2(update: Update, context: CallbackContext):
+async def create_fast_event_button(update: Update, context: CallbackContext):
+    """
+    Кнопка под сообщением с локацией.
+    Принимает id локации.
+    При нажатии событие создается автоматически.
+    """
     query = update.callback_query
     chat_id = query.from_user.id
 
@@ -454,7 +447,12 @@ async def b2(update: Update, context: CallbackContext):
         'Событие создано!')
 
 
-async def b3(update: Update, context: CallbackContext):
+async def add_favorite_button(update: Update, context: CallbackContext):
+    """
+    Кнопка под сообщением с локацией.
+    Принимает id локации и имя локации.
+    При нажатии добавляет локацию в избранное.
+    """
     query = update.callback_query
     chat_id = query.from_user.id
 
@@ -469,7 +467,12 @@ async def b3(update: Update, context: CallbackContext):
         chat_id, f'{element_name} добавлено в избранное!')
 
 
-async def b5(update: Update, context: CallbackContext):
+async def delete_favorite_button(update: Update, context: CallbackContext):
+    """
+    Кнопка под сообщением с локацией.
+    Принимает id локации и имя локации.
+    При нажатии удаляет локацию из избранного.
+    """
     query = update.callback_query
     chat_id = query.from_user.id
 
@@ -484,7 +487,12 @@ async def b5(update: Update, context: CallbackContext):
         chat_id, f'{element_name} Удалено из избранного!')
 
 
-async def b4(update: Update, context: CallbackContext):
+async def confirm_parti_button(update: Update, context: CallbackContext):
+    """
+    Кнопка под сообщением с событием.
+    Принимает id и name события.
+    При нажатии пользователь подтверждает участие в событии.
+    """
     query = update.callback_query
     chat_id = str(query.from_user.id)
 
@@ -498,7 +506,12 @@ async def b4(update: Update, context: CallbackContext):
         f'Участие в {event_name} подтверждено')
 
 
-async def b6(update: Update, context: CallbackContext):
+async def delete_subscribe_button(update: Update, context: CallbackContext):
+    """
+    Кнопка под сообщением с именем 'пользователь, на которого он подписан'.
+    Принимает id обоих пользовтелей.
+    При нажатии удаляет подписку на этого пользователя.
+    """
     query = update.callback_query
     telegram_id = query.from_user.id
 
@@ -513,7 +526,12 @@ async def b6(update: Update, context: CallbackContext):
         telegram_id, f'Подписка на {telegram_username} удалена!')
 
 
-async def b7(update: Update, context: CallbackContext):
+async def add_subscribe_button(update: Update, context: CallbackContext):
+    """
+    Кнопка под сообщением с событием.
+    Принимает id и name создателя события.
+    При нажатии пользователь подписывается на создателя события.
+    """
     query = update.callback_query
     telegram_id = query.from_user.id
 
@@ -527,9 +545,14 @@ async def b7(update: Update, context: CallbackContext):
         telegram_id, f'Ты подписался на {subscription_username}!')
 
 
-async def create_event_place(update: Update, context: CallbackContext):
+async def create_event(update: Update, context: CallbackContext):
+    """
+    Функция запускает переписку с пользователем.
+    Пользователь последовательно вводит параметры события.
+    Последняя функция в цепочке создает событие.
+    """
     message_text = update.message.text
-    match = re.match(r'^/create_event_place_(\d+)', message_text)
+    match = re.match(r'^/create_event_(\d+)', message_text)
 
     if match:
         place_id = match.group(1)
@@ -539,45 +562,48 @@ async def create_event_place(update: Update, context: CallbackContext):
             update.message.from_user.id)
 
         await update.message.reply_text('Введи название события:')
-        return NAME
+        return EVENT_NAME
     else:
         await update.message.reply_text(
             'Неверный формат команды. '
-            'Используйте /create_event_place_<place_id>')
+            'Используйте /create_event_<place_id>')
         return ConversationHandler.END
 
 
-async def name(update: Update, context: CallbackContext):
+async def get_event_name(update: Update, context: CallbackContext):
+    """Функция принимает и проверяет имя события."""
     text = update.message.text
-    match = re.match(r'^[a-zA-Zа-яА-Я]{1,25}$', text)
+    match = re.match(r'^\s*[a-zA-Zа-яА-Я\s]{1,25}\s*$', text)
     if not match:
         await update.message.reply_text(
             'Нет такое имя не пойдет!'
             '\nТолько буквы. Не больше 25 символов!'
             '\nПопробуй ещё разок дружок пирожок:')
-        return NAME
+        return EVENT_NAME
     context.user_data['event']['name'] = text
     chat_id = update.effective_chat.id
     await context.bot.send_message(chat_id, 'Введи описание события:')
-    return DESCRIPTION
+    return EVENT_DESCRIPTION
 
 
-async def description(update: Update, context: CallbackContext):
+async def get_event_description(update: Update, context: CallbackContext):
+    """Функция принимает и проверяет описание события."""
     text = update.message.text
-    match = re.match(r'^[a-zA-Zа-яА-Я]{1,25}$', text)
+    match = re.match(r'^\s*[a-zA-Zа-яА-Я\s]{1,25}\s*$', text)
     if not match:
         await update.message.reply_text(
             'Нет такое описание не пойдет!'
             '\nТолько буквы. Не больше 25 символов!'
             '\nПопробуй ещё разок дружок пирожок:')
-        return DESCRIPTION
+        return EVENT_DESCRIPTION
     context.user_data['event']['description'] = text
     chat_id = update.effective_chat.id
     await context.bot.send_message(chat_id, 'Введи дату события (дд-мм-гггг):')
-    return DATE
+    return EVENT_DATE
 
 
 async def is_valid_date(date_str):
+    """Функция валидации даты события."""
     try:
         datetime.strptime(date_str, '%d-%m-%Y')
         return True
@@ -585,21 +611,23 @@ async def is_valid_date(date_str):
         return False
 
 
-async def date(update: Update, context: CallbackContext):
+async def get_event_date(update: Update, context: CallbackContext):
+    """Функция принимает и проверяет дату события."""
     text = update.message.text
     if not await is_valid_date(text):
         await update.message.reply_text(
             'Нет такая дата не пойдет!'
             '\nТолько такой формат -> дд-мм-гггг!'
             '\nПопробуй ещё разок дружок пирожок:')
-        return DATE
+        return EVENT_DATE
     context.user_data['event']['date'] = text
     chat_id = update.effective_chat.id
     await context.bot.send_message(chat_id, 'Введи время начала (чч:мм):')
-    return TIME
+    return EVENT_TIME
 
 
 async def is_valid_time(time_str):
+    """Функция валидации времени события."""
     try:
         datetime.strptime(time_str, '%H:%M')
         return True
@@ -607,21 +635,26 @@ async def is_valid_time(time_str):
         return False
 
 
-async def time(update: Update, context: CallbackContext):
+async def get_event_time(update: Update, context: CallbackContext):
+    """Функция принимает и проверяет время начала события."""
     text = update.message.text
     if not await is_valid_time(text):
         await update.message.reply_text(
             'Нет такое время не пойдет!'
             '\nТолько такой формат -> чч:мм!'
             '\nПопробуй ещё разок дружок пирожок:')
-        return TIME
+        return EVENT_TIME
     context.user_data['event']['time'] = text
     chat_id = update.effective_chat.id
     await context.bot.send_message(chat_id, 'Введи длительность в часах:')
-    return DURATION
+    return EVENT_DURATION
 
 
-async def duration(update: Update, context: CallbackContext):
+async def get_event_duration(update: Update, context: CallbackContext):
+    """
+    Функция принимает и проверяет длительность события.
+    В случе успеха создает событие по заданным параметрам.
+    """
     duration = update.message.text
     try:
         duration = int(duration)
@@ -632,13 +665,13 @@ async def duration(update: Update, context: CallbackContext):
                 'Ни куда не годится!'
                 '\nНе больше 12 часов!'
                 '\nПопробуй ещё разок дружок пирожок:')
-            return DURATION
+            return EVENT_DURATION
     except ValueError:
         await update.message.reply_text(
             'Ни куда не годится!'
             '\nТолько цифра!'
             '\nПопробуй ещё разок дружок пирожок:')
-        return DURATION
+        return EVENT_DURATION
 
     event = context.user_data["event"]
     date_str = f'{event["date"]} {event["time"]}:00.123000'
@@ -665,11 +698,16 @@ async def duration(update: Update, context: CallbackContext):
 
 async def user_favotite_places(
         update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Функция выводит избранные места пользователя."""
     await handle_location(update, context, favorite='yes')
 
 
 async def search_place(update: Update, context: CallbackContext):
-
+    """
+    Функция запускает переписку с пользователем.
+    Пользователь последовательно вводит имя места и регион.
+    Последняя функция в цепочке выводит результат поиска по параметрам.
+    """
     context.user_data['search'] = {}
     context.user_data['search']['chat_id'] = str(
         update.message.from_user.id)
@@ -681,6 +719,7 @@ async def search_place(update: Update, context: CallbackContext):
 
 
 async def search_name(update: Update, context: CallbackContext):
+    """Функция принимает и проверяет имя места."""
     text = update.message.text
     match = re.match(r'^\s*[a-zA-Zа-яА-Я\s]{1,25}\s*$', text)
     if not match:
@@ -701,6 +740,10 @@ async def search_name(update: Update, context: CallbackContext):
 
 
 async def search_region_name(update: Update, context: CallbackContext):
+    """
+    Функция принимает и проверяет название региона.
+    В случае успеха запускает поиск с заданными параметрами.
+    """
     text = update.message.text
     match = re.match(r'^\s*[a-zA-Zа-яА-Я\s]{1,25}\s*$', text)
     if not match:
@@ -731,6 +774,7 @@ async def search_region_name(update: Update, context: CallbackContext):
 
 async def user_subscriptions(
         update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Функция отображения подписок пользователя на других пользователей."""
     chat_id = update.message.chat_id
 
     users = await get_user_subscription(telegram_id=chat_id)
@@ -743,7 +787,9 @@ async def user_subscriptions(
         telegram_username = user['telegram_username']
         button = [InlineKeyboardButton(
             "Удалить из избранного",
-            callback_data=f'b6|{user_telegram_id}|{telegram_username}'
+            callback_data=('delete_subscribe_button|'
+                           f'{user_telegram_id}|'
+                           f'{telegram_username}')
             )]
         keyboard = InlineKeyboardMarkup([button])
         text = f'@{telegram_username}'
@@ -768,29 +814,36 @@ def main():
                 r'🕺 Подписки 🕺'), user_subscriptions)
     application.add_handler(user_subscription)
 
-    application.add_handler(CallbackQueryHandler(b1, pattern="b1"))
-    application.add_handler(CallbackQueryHandler(b2, pattern="b2"))
-    application.add_handler(CallbackQueryHandler(b3, pattern="b3"))
-    application.add_handler(CallbackQueryHandler(b4, pattern="b4"))
-    application.add_handler(CallbackQueryHandler(b5, pattern="b5"))
-    application.add_handler(CallbackQueryHandler(b6, pattern="b6"))
-    application.add_handler(CallbackQueryHandler(b7, pattern="b7"))
+    application.add_handler(CallbackQueryHandler(
+        details_button, pattern="details_button"))
+    application.add_handler(CallbackQueryHandler(
+        create_fast_event_button, pattern="create_fast_event_button"))
+    application.add_handler(CallbackQueryHandler(
+        add_favorite_button, pattern="add_favorite_button"))
+    application.add_handler(CallbackQueryHandler(
+        confirm_parti_button, pattern="confirm_parti_button"))
+    application.add_handler(CallbackQueryHandler(
+        delete_favorite_button, pattern="delete_favorite_button"))
+    application.add_handler(CallbackQueryHandler(
+        delete_subscribe_button, pattern="delete_subscribe_button"))
+    application.add_handler(CallbackQueryHandler(
+        add_subscribe_button, pattern="add_subscribe_button"))
 
     conversation_handler = ConversationHandler(
         entry_points=[MessageHandler(
             filters.TEXT & filters.Regex(
-                r'^/create_event_place_\d+'), create_event_place)],
+                r'^/create_event_\d+'), create_event)],
         states={
-            NAME: [MessageHandler(
-                filters.TEXT & (~filters.COMMAND), name)],
-            DESCRIPTION: [MessageHandler(
-                filters.TEXT & (~filters.COMMAND), description)],
-            DATE: [MessageHandler(
-                filters.TEXT & (~filters.COMMAND), date)],
-            TIME: [MessageHandler(
-                filters.TEXT & (~filters.COMMAND), time)],
-            DURATION: [MessageHandler(
-                filters.TEXT & (~filters.COMMAND), duration)],
+            EVENT_NAME: [MessageHandler(
+                filters.TEXT & (~filters.COMMAND), get_event_name)],
+            EVENT_DESCRIPTION: [MessageHandler(
+                filters.TEXT & (~filters.COMMAND), get_event_description)],
+            EVENT_DATE: [MessageHandler(
+                filters.TEXT & (~filters.COMMAND), get_event_date)],
+            EVENT_TIME: [MessageHandler(
+                filters.TEXT & (~filters.COMMAND), get_event_time)],
+            EVENT_DURATION: [MessageHandler(
+                filters.TEXT & (~filters.COMMAND), get_event_duration)],
         },
         fallbacks=[]
     )

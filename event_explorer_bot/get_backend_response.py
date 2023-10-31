@@ -1,10 +1,12 @@
 import httpx
 import asyncio
+from typing import Union, Any
 
 base_url = 'http://0.0.0.0:8000'
 
 
-async def get_response(*args, **kwargs):
+async def get_response(*args, **kwargs) -> Union[dict, Any]:
+    """Получение ответа от backend."""
     endpoint = kwargs.get('endpoint')
     data = kwargs.get('data')
     method = kwargs.get('method')
@@ -24,20 +26,27 @@ async def get_response(*args, **kwargs):
         return {'error': 'Failed to get the response'}
 
 
-async def get_command_response(command: str, telegram_id: str):
+async def get_command_response(
+        command: str,
+        telegram_id: str) -> Union[dict, Any]:
+    """Получение ответа на команду."""
     endpoint = f'/commands/{command}/?telegram_id={telegram_id}'
     response = await get_response(endpoint=endpoint)
     return response['response']
 
 
 async def get_message_response(message: str, telegram_id: str):
+    """Получение ответа на сообщение."""
     endpoint = f'/messages/{message}/?telegram_id={telegram_id}'
     response = await get_response(endpoint=endpoint)
     return response['response']
 
 
 async def get_location_response(
-        telegram_id: str, latitude: str, longitude: str):
+        telegram_id: str,
+        latitude: float,
+        longitude: float) -> Union[dict, Any]:
+    """Получение локаций по координатам."""
     endpoint = ('/locations/?'
                 f'telegram_id={telegram_id}&'
                 f'latitude={latitude}&'
@@ -47,7 +56,10 @@ async def get_location_response(
 
 
 async def get_search_by_name_response(
-        telegram_id: str, region_name: str, place_name: str):
+        telegram_id: str,
+        region_name: str,
+        place_name: str) -> Union[dict, Any]:
+    """Получение локаций по имени и региону."""
     endpoint = ('/locations/search/?'
                 f'telegram_id={telegram_id}&'
                 f'region_name={region_name}&'
@@ -56,7 +68,8 @@ async def get_search_by_name_response(
     return response['response']['elements']
 
 
-async def get_user(telegram_id: str):
+async def get_user(telegram_id: str) -> Union[dict, Any]:
+    """Получение пользователя по telegram_id."""
     endpoint = f'/users/{telegram_id}/'
     return await get_response(endpoint=endpoint)
 
@@ -67,7 +80,8 @@ async def post_user(
         first_name: str,
         last_name: str,
         language_code: str,
-        is_bot: bool):
+        is_bot: bool) -> Union[dict, Any]:
+    """Создание пользователя."""
     endpoint = '/users/'
     data = {
         'telegram_id': telegram_id,
@@ -86,7 +100,8 @@ async def post_event(
         telegram_id: str,
         place_id: str,
         start_datetime: str,
-        end_datetime: str):
+        end_datetime: str) -> Union[dict, Any]:
+    """Создание события."""
     endpoint = '/events/'
     data = {
         'name': name,
@@ -99,7 +114,10 @@ async def post_event(
     return await get_response(endpoint=endpoint, data=data, method='post')
 
 
-async def post_event_subscription(telegram_id: str, event_id: int):
+async def post_event_subscription(
+        telegram_id:
+        str, event_id: int) -> Union[dict, Any]:
+    """Создание подписки на событие."""
     endpoint = '/users/events/subscription/'
     data = {
         'telegram_id': telegram_id,
@@ -108,7 +126,10 @@ async def post_event_subscription(telegram_id: str, event_id: int):
     return await get_response(endpoint=endpoint, data=data, method='post')
 
 
-async def post_place_subscription(telegram_id: str, place_id: str):
+async def post_place_subscription(
+        telegram_id: str,
+        place_id: str) -> Union[dict, Any]:
+    """Создание подписки на место."""
     endpoint = '/users/places/subscription/'
     data = {
         'telegram_id': telegram_id,
@@ -117,12 +138,16 @@ async def post_place_subscription(telegram_id: str, place_id: str):
     return await get_response(endpoint=endpoint, data=data, method='post')
 
 
-async def delete_place_subscription(telegram_id: str, place_id: str):
+async def delete_place_subscription(
+        telegram_id: str,
+        place_id: str) -> Union[dict, Any]:
+    """Удаление подписки на место."""
     endpoint = f'/users/{telegram_id}/places/subscription/?place_id={place_id}'
     return await get_response(endpoint=endpoint, method='delete')
 
 
-async def get_place_subscription(telegram_id: str):
+async def get_place_subscription(telegram_id: str) -> Union[dict, Any]:
+    """Получение подписок пользователя telegram_id на места."""
     endpoint = f'/users/{telegram_id}/places/subscription/'
     response = await get_response(endpoint=endpoint)
     if response.get('error'):
@@ -130,7 +155,10 @@ async def get_place_subscription(telegram_id: str):
     return response['response']['elements']
 
 
-async def get_place_detail_response(telegram_id: str, place_id: str):
+async def get_place_detail_response(
+        telegram_id: str,
+        place_id: str) -> Union[dict, Any]:
+    """Получение места по place_id."""
     endpoint = f'/places/{place_id}/?telegram_id={telegram_id}'
     response = await get_response(endpoint=endpoint)
     if response.get('error'):
@@ -138,13 +166,17 @@ async def get_place_detail_response(telegram_id: str, place_id: str):
     return response['response']['elements'][0]
 
 
-async def get_user_subscription(telegram_id: str):
+async def get_user_subscription(telegram_id: str) -> Union[dict, Any]:
+    """Получение подписок на пользователей по telegram_id."""
     endpoint = f'/users/{telegram_id}/subscription/'
     response = await get_response(endpoint=endpoint)
     return response['response']
 
 
-async def post_user_subscription(telegram_id: str, subscription_id: str):
+async def post_user_subscription(
+        telegram_id: str,
+        subscription_id: str) -> Union[dict, Any]:
+    """Создание подписки на пользователя subscription_id."""
     endpoint = '/users/subscription/'
     data = {
         'telegram_id': telegram_id,
@@ -153,7 +185,10 @@ async def post_user_subscription(telegram_id: str, subscription_id: str):
     return await get_response(endpoint=endpoint, data=data, method='post')
 
 
-async def delete_user_subscription(telegram_id: str, subscription_id: str):
+async def delete_user_subscription(
+        telegram_id: str,
+        subscription_id: str) -> Union[dict, Any]:
+    """Удаление подписки на пользователя subscription_id."""
     endpoint = (f'/users/{telegram_id}/subscription/?'
                 f'subscription_id={subscription_id}')
     return await get_response(endpoint=endpoint, method='delete')
