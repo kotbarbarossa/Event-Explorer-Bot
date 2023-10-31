@@ -13,9 +13,7 @@ from get_backend_response import (post_event,
                                   post_user_subscription,
                                   delete_user_subscription)
 
-EMOJI_LIST = ['😄', '🎉', '🥳', '🎈', '🌟', '🎁', '🎂', '🍾', '🎊', '🥂',
-              '🤩', '🍰', '🎆', '🎇', '🎗️', '🎀', '🧨', '🪅', '🎵', '🎷',
-              '🎸', '🎶', '🍸', '🍹', '🍻', '🕺', '💃', '🕶️', '📸', '🌈']
+from parsers import parse_event
 
 EVENTS_NAMES = [
     "Шоколадный дождь",
@@ -103,44 +101,14 @@ async def details_button(update: Update, context: CallbackContext):
             subscription_id = event.get('user_id')
             subscription_username = event.get('telegram_username')
             event_id = event.get('id')
-
-            time_obj_start = datetime.fromisoformat(
-                event.get('start_datetime'))
-            time_obj_end = datetime.fromisoformat(
-                event.get('end_datetime'))
-            event_wnen = time_obj_start.strftime('%d/%m/%Y')
             event_name = event.get('name')
-            event_description = event.get('description')
             if event.get('telegram_username'):
                 event_tg_username = (
                     f'@{event.get("telegram_username")}')
             else:
                 event_tg_username = 'Безымянный Джо'
-            event_start = time_obj_start.strftime('%H:%M')
-            event_end = time_obj_end.strftime('%H:%M')
-            event_participants = event.get('event_participants')
-            emoji_one = random.choice(EMOJI_LIST)
-            emoji_two = random.choice(EMOJI_LIST)
-            emoji_three = random.choice(EMOJI_LIST)
-            text += f'\n{emoji_one}{emoji_two}{emoji_three}'
-            text += f'\nКогда: {event_wnen}'
-            text += f'\nНазвание: {event_name}'
-            if event_description:
-                text += f'\nОписание: {event_description}'
-            text += f'\nОрганизует: {event_tg_username}'
-            text += f'\nНачало: {event_start}'
-            text += f'\nКонец: {event_end}'
-            if event_participants:
-                text += '\nУчастники: '
-                for user in event_participants:
-                    if user.get('telegram_username'):
-                        tg_username = (
-                            f'@{user.get("telegram_username")}')
-                    else:
-                        tg_username = 'Безымянный Джо'
-                    text += f'\n{random.choice(EMOJI_LIST)} '
-                    text += f'{tg_username}'
-            text += '\n'
+
+            text += await parse_event(event=event)
 
             buttons = []
             event_button = [InlineKeyboardButton(
