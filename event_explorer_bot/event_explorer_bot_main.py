@@ -18,15 +18,17 @@ from get_backend_response import (get_command_response,
                                   get_user,
                                   post_user,
                                   post_event,
-                                  post_event_subscription,
                                   get_place_subscription,
-                                  post_place_subscription,
-                                  delete_place_subscription,
                                   get_search_by_name_response,
-                                  get_user_subscription,
-                                  delete_user_subscription,
-                                  get_place_detail_response,
-                                  post_user_subscription)
+                                  get_user_subscription)
+
+from buttons import (details_button,
+                     create_fast_event_button,
+                     add_favorite_button,
+                     confirm_parti_button,
+                     delete_favorite_button,
+                     add_subscribe_button,
+                     delete_subscribe_button)
 
 load_dotenv()
 
@@ -153,6 +155,86 @@ async def handle_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(chat_id=update.effective_chat.id, text=text)
 
 
+async def parse_element(element) -> str:
+    text = ''
+    amenity = element['tags'].get('amenity')
+    name = element['tags'].get(
+        'name') or element['tags'].get('name:en')
+    name_ru = element['tags'].get('name:ru')
+    opening_hours = element['tags'].get('opening_hours')
+    cuisine = element['tags'].get('cuisine')
+    outdoor_seating = element['tags'].get('outdoor_seating')
+    website = element['tags'].get('website')
+    website_menu = element['tags'].get('website:menu')
+    contact_vk = element['tags'].get('contact:vk')
+    contact_website = element['tags'].get('contact:website')
+
+    text = f'<b>{name}</b>'
+
+    if amenity:
+        text += f' <i>{amenity}</i>'
+    if name_ru:
+        text += f'\n{name_ru}'
+    if opening_hours:
+        text += f'\nВремя работы: {opening_hours}'
+    if cuisine:
+        text += f'\nКухня: {cuisine.replace(";", ", ")}'
+    if outdoor_seating == 'yes':
+        text += '\nЕсть терасса'
+    if website:
+        text += f'\n{website}'
+    if website_menu:
+        text += f'\nМеню: {website_menu}'
+    if contact_vk:
+        text += f'\nVK: {contact_vk}'
+    if contact_website:
+        text += f'\n{contact_website}'
+    return text
+
+
+async def parse_event(event) -> str:
+    text = ''
+
+    time_obj_start = datetime.fromisoformat(
+        event.get('start_datetime'))
+    time_obj_end = datetime.fromisoformat(
+        event.get('end_datetime'))
+    event_wnen = time_obj_start.strftime('%d/%m/%Y')
+    event_name = event.get('name')
+    event_description = event.get('description')
+    if event.get('telegram_username'):
+        event_tg_username = (
+            f'@{event.get("telegram_username")}')
+    else:
+        event_tg_username = 'Безымянный Джо'
+    event_start = time_obj_start.strftime('%H:%M')
+    event_end = time_obj_end.strftime('%H:%M')
+    event_participants = event.get('event_participants')
+    emoji_one = random.choice(EMOJI_LIST)
+    emoji_two = random.choice(EMOJI_LIST)
+    emoji_three = random.choice(EMOJI_LIST)
+    text += f'\n{emoji_one}{emoji_two}{emoji_three}'
+    text += f'\nКогда: {event_wnen}'
+    text += f'\nНазвание: {event_name}'
+    if event_description:
+        text += f'\nОписание: {event_description}'
+    text += f'\nОрганизует: {event_tg_username}'
+    text += f'\nНачало: {event_start}'
+    text += f'\nКонец: {event_end}'
+    if event_participants:
+        text += '\nУчастники: '
+        for user in event_participants:
+            if user.get('telegram_username'):
+                tg_username = (
+                    f'@{user.get("telegram_username")}')
+            else:
+                tg_username = 'Безымянный Джо'
+            text += f'\n{random.choice(EMOJI_LIST)} '
+            text += f'{tg_username}'
+    text += '\n'
+    return text
+
+
 async def handle_location(
         update: Update,
         context: ContextTypes.DEFAULT_TYPE, **kwargs):
@@ -179,38 +261,7 @@ async def handle_location(
             element_id = element['id']
             events = element.get('events')
 
-            amenity = element['tags'].get('amenity')
-            name = element['tags'].get(
-                'name') or element['tags'].get('name:en')
-            name_ru = element['tags'].get('name:ru')
-            opening_hours = element['tags'].get('opening_hours')
-            cuisine = element['tags'].get('cuisine')
-            outdoor_seating = element['tags'].get('outdoor_seating')
-            website = element['tags'].get('website')
-            website_menu = element['tags'].get('website:menu')
-            contact_vk = element['tags'].get('contact:vk')
-            contact_website = element['tags'].get('contact:website')
-
-            text = f'<b>{name}</b>'
-
-            if amenity:
-                text += f' <i>{amenity}</i>'
-            if name_ru:
-                text += f'\n{name_ru}'
-            if opening_hours:
-                text += f'\nВремя работы: {opening_hours}'
-            if cuisine:
-                text += f'\nКухня: {cuisine.replace(";", ", ")}'
-            if outdoor_seating == 'yes':
-                text += '\nЕсть терасса'
-            if website:
-                text += f'\n{website}'
-            if website_menu:
-                text += f'\nМеню: {website_menu}'
-            if contact_vk:
-                text += f'\nVK: {contact_vk}'
-            if contact_website:
-                text += f'\n{contact_website}'
+            text = await parse_element(element)
 
             buttons = [
                     [InlineKeyboardButton(
@@ -223,47 +274,7 @@ async def handle_location(
             if events:
                 text += f'\n\n<b>Найдено {len(events)} событий:</b>'
                 for event in events:
-                    time_obj_start = datetime.fromisoformat(
-                        event.get('start_datetime'))
-                    time_obj_end = datetime.fromisoformat(
-                        event.get('end_datetime'))
-
-                    event_wnen = time_obj_start.strftime('%d/%m/%Y')
-                    event_name = event.get('name')
-                    event_description = event.get('description')
-
-                    if event.get('telegram_username'):
-                        event_tg_username = (
-                            f'@{event.get("telegram_username")}')
-                    else:
-                        event_tg_username = 'Безымянный Джо'
-                    event_start = time_obj_start.strftime('%H:%M')
-                    event_end = time_obj_end.strftime('%H:%M')
-                    event_participants = event.get('event_participants')
-
-                    emoji_one = random.choice(EMOJI_LIST)
-                    emoji_two = random.choice(EMOJI_LIST)
-                    emoji_three = random.choice(EMOJI_LIST)
-
-                    text += f'\n{emoji_one}{emoji_two}{emoji_three}'
-                    text += f'\nКогда: {event_wnen}'
-                    text += f'\nНазвание: {event_name}'
-                    if event_description:
-                        text += f'\nОписание: {event_description}'
-                    text += f'\nОрганизует: {event_tg_username}'
-                    text += f'\nНачало: {event_start}'
-                    text += f'\nКонец: {event_end}'
-                    if event_participants:
-                        text += '\nУчастники: '
-                        for user in event_participants:
-                            if user.get('telegram_username'):
-                                tg_username = (
-                                    f'@{user.get("telegram_username")}')
-                            else:
-                                tg_username = 'Безымянный Джо'
-                            text += f'\n{random.choice(EMOJI_LIST)} '
-                            text += f'{tg_username}'
-                    text += '\n'
+                    text += await parse_event(event=event)
 
             keyboard = InlineKeyboardMarkup(buttons)
 
@@ -275,274 +286,38 @@ async def handle_location(
                 )
 
 
-async def details_button(update: Update, context: CallbackContext):
-    """
-    Кнопка "Смотреть на карте" под сообщением с локацией.
-    Принимает id локации и параметр favorite.
-    При нажатии присылает локацию места и список событий если они есть.
-    """
-    query = update.callback_query
-    chat_id = query.from_user.id
-    callback_data = query.data.split('|')
-    element_id = callback_data[1]
-    favorite = callback_data[2]
-    emoji = "⬇"
+async def user_favotite_places(
+        update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Функция выводит избранные места пользователя."""
+    await handle_location(update, context, favorite='yes')
 
-    place_detail = await get_place_detail_response(
-        telegram_id=chat_id, place_id=element_id)
-    latitude = place_detail['lat']
-    longitude = place_detail['lon']
-    name = place_detail['tags']['name']
-    events = place_detail.get('events')
 
-    text_location = ('Чтобы узнать маршрут'
-                     f'\nдо <b>{name}</b>'
-                     f'\nнажми на карту {emoji}.')
+async def user_subscriptions(
+        update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Функция отображения подписок пользователя на других пользователей."""
+    chat_id = update.message.chat_id
 
-    if favorite == 'yes':
+    users = await get_user_subscription(telegram_id=chat_id)
+
+    if not users:
+        text = 'У вас пока нет подписок на пользователей'
+        return await context.bot.send_message(chat_id, text)
+    for user in users:
+        user_telegram_id = user['telegram_id']
+        telegram_username = user['telegram_username']
         button = [InlineKeyboardButton(
             "Удалить из избранного",
-            callback_data=f'delete_favorite_button|{element_id}|{name}'
+            callback_data=('delete_subscribe_button|'
+                           f'{user_telegram_id}|'
+                           f'{telegram_username}')
             )]
-    else:
-        button = [InlineKeyboardButton(
-            "Добавить место в избранное",
-            callback_data=f'add_favorite_button|{element_id}|{name}'
-            )]
-
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=text_location,
-        parse_mode=ParseMode.HTML)
-
-    keyboard = InlineKeyboardMarkup(
-        [
-            [InlineKeyboardButton(
-                "Пойду сечас (свое событие)",
-                callback_data=f'create_fast_event_button|{element_id}'
-                )],
-            button,
-        ]
-    )
-    await context.bot.send_location(
-        chat_id=chat_id,
-        latitude=latitude,
-        longitude=longitude,
-        reply_markup=keyboard,
-        )
-
-    if events:
-        for event in events:
-            text = ''
-            subscription_id = event.get('user_id')
-            subscription_username = event.get('telegram_username')
-            time_obj_start = datetime.fromisoformat(
-                event.get('start_datetime'))
-            time_obj_end = datetime.fromisoformat(
-                event.get('end_datetime'))
-
-            event_wnen = time_obj_start.strftime('%d/%m/%Y')
-            event_id = event.get('id')
-            event_name = event.get('name')
-            event_description = event.get('description')
-
-            if event.get('telegram_username'):
-                event_tg_username = (
-                    f'@{event.get("telegram_username")}')
-            else:
-                event_tg_username = 'Безымянный Джо'
-            event_start = time_obj_start.strftime('%H:%M')
-            event_end = time_obj_end.strftime('%H:%M')
-            event_participants = event.get('event_participants')
-
-            emoji_one = random.choice(EMOJI_LIST)
-            emoji_two = random.choice(EMOJI_LIST)
-            emoji_three = random.choice(EMOJI_LIST)
-
-            text += f'\n{emoji_one}{emoji_two}{emoji_three}'
-            text += f'\nКогда: {event_wnen}'
-            text += f'\nНазвание: {event_name}'
-            if event_description:
-                text += f'\nОписание: {event_description}'
-            text += f'\nОрганизует: {event_tg_username}'
-            text += f'\nНачало: {event_start}'
-            text += f'\nКонец: {event_end}'
-            if event_participants:
-                text += '\nУчастники: '
-                for user in event_participants:
-                    if user.get('telegram_username'):
-                        tg_username = (
-                            f'@{user.get("telegram_username")}')
-                    else:
-                        tg_username = 'Безымянный Джо'
-                    text += f'\n{random.choice(EMOJI_LIST)} '
-                    text += f'{tg_username}'
-            text += '\n'
-            buttons = []
-            event_button = [InlineKeyboardButton(
-                        f'пойду к {event_tg_username} на {event_name}',
-                        callback_data=(
-                            f'confirm_parti_button|'
-                            f'{event_id}|'
-                            f'{event_name}'
-                            )
-                        )
-                        ]
-            buttons.append(event_button)
-            if subscription_username:
-                subscribe_button = [InlineKeyboardButton(
-                            f'Подписаться на {event_tg_username}',
-                            callback_data=(
-                                f'add_subscribe_button|'
-                                f'{subscription_id}|'
-                                f'{event_tg_username}'
-                                )
-                            )
-                            ]
-                buttons.append(subscribe_button)
-            keyboard = InlineKeyboardMarkup(buttons)
-
-            await context.bot.send_message(
+        keyboard = InlineKeyboardMarkup([button])
+        text = f'@{telegram_username}'
+        return await context.bot.send_message(
                     chat_id=chat_id,
                     text=text,
                     reply_markup=keyboard,
-                    parse_mode=ParseMode.HTML
                     )
-
-    await context.bot.send_message(
-        chat_id,
-        f'Чтобы создать событие с параметрами жми сюда {emoji} '
-        f'\n/create_event_{element_id}',
-        )
-
-
-async def create_fast_event_button(update: Update, context: CallbackContext):
-    """
-    Кнопка под сообщением с локацией.
-    Принимает id локации.
-    При нажатии событие создается автоматически.
-    """
-    query = update.callback_query
-    chat_id = query.from_user.id
-
-    callback_data_parts = update.callback_query.data.split("|")
-
-    element_id = callback_data_parts[1]
-
-    start_datetime = datetime.now()
-    end_datetime = start_datetime + timedelta(hours=3)
-
-    random_name = random.choice(EVENTS_NAMES)
-
-    await post_event(
-        name=random_name,
-        description='',
-        telegram_id=str(chat_id),
-        place_id=element_id,
-        start_datetime=start_datetime.isoformat(),
-        end_datetime=end_datetime.isoformat())
-
-    await context.bot.send_message(
-        chat_id,
-        'Событие создано!')
-
-
-async def add_favorite_button(update: Update, context: CallbackContext):
-    """
-    Кнопка под сообщением с локацией.
-    Принимает id локации и имя локации.
-    При нажатии добавляет локацию в избранное.
-    """
-    query = update.callback_query
-    chat_id = query.from_user.id
-
-    callback_data_parts = update.callback_query.data.split("|")
-
-    element_id = callback_data_parts[1]
-    element_name = callback_data_parts[2]
-
-    await post_place_subscription(
-        telegram_id=str(chat_id), place_id=str(element_id))
-    await context.bot.send_message(
-        chat_id, f'{element_name} добавлено в избранное!')
-
-
-async def delete_favorite_button(update: Update, context: CallbackContext):
-    """
-    Кнопка под сообщением с локацией.
-    Принимает id локации и имя локации.
-    При нажатии удаляет локацию из избранного.
-    """
-    query = update.callback_query
-    chat_id = query.from_user.id
-
-    callback_data_parts = update.callback_query.data.split("|")
-
-    element_id = callback_data_parts[1]
-    element_name = callback_data_parts[2]
-
-    await delete_place_subscription(
-        telegram_id=str(chat_id), place_id=str(element_id))
-    await context.bot.send_message(
-        chat_id, f'{element_name} Удалено из избранного!')
-
-
-async def confirm_parti_button(update: Update, context: CallbackContext):
-    """
-    Кнопка под сообщением с событием.
-    Принимает id и name события.
-    При нажатии пользователь подтверждает участие в событии.
-    """
-    query = update.callback_query
-    chat_id = str(query.from_user.id)
-
-    callback_data_parts = update.callback_query.data.split("|")
-
-    event_id = int(callback_data_parts[1])
-    event_name = callback_data_parts[2]
-    await post_event_subscription(telegram_id=chat_id, event_id=event_id)
-    await context.bot.send_message(
-        chat_id,
-        f'Участие в {event_name} подтверждено')
-
-
-async def delete_subscribe_button(update: Update, context: CallbackContext):
-    """
-    Кнопка под сообщением с именем 'пользователь, на которого он подписан'.
-    Принимает id обоих пользовтелей.
-    При нажатии удаляет подписку на этого пользователя.
-    """
-    query = update.callback_query
-    telegram_id = query.from_user.id
-
-    callback_data_parts = update.callback_query.data.split("|")
-
-    subscription_id = callback_data_parts[1]
-    telegram_username = callback_data_parts[2]
-
-    await delete_user_subscription(
-        telegram_id=str(telegram_id), subscription_id=str(subscription_id))
-    await context.bot.send_message(
-        telegram_id, f'Подписка на {telegram_username} удалена!')
-
-
-async def add_subscribe_button(update: Update, context: CallbackContext):
-    """
-    Кнопка под сообщением с событием.
-    Принимает id и name создателя события.
-    При нажатии пользователь подписывается на создателя события.
-    """
-    query = update.callback_query
-    telegram_id = query.from_user.id
-
-    callback_data_parts = update.callback_query.data.split("|")
-
-    subscription_id = callback_data_parts[1]
-    subscription_username = callback_data_parts[2]
-    await post_user_subscription(
-        telegram_id=str(telegram_id), subscription_id=str(subscription_id))
-    await context.bot.send_message(
-        telegram_id, f'Ты подписался на {subscription_username}!')
 
 
 async def create_event(update: Update, context: CallbackContext):
@@ -696,12 +471,6 @@ async def get_event_duration(update: Update, context: CallbackContext):
     return ConversationHandler.END
 
 
-async def user_favotite_places(
-        update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Функция выводит избранные места пользователя."""
-    await handle_location(update, context, favorite='yes')
-
-
 async def search_place(update: Update, context: CallbackContext):
     """
     Функция запускает переписку с пользователем.
@@ -770,34 +539,6 @@ async def search_region_name(update: Update, context: CallbackContext):
     context.user_data.clear()
 
     return ConversationHandler.END
-
-
-async def user_subscriptions(
-        update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Функция отображения подписок пользователя на других пользователей."""
-    chat_id = update.message.chat_id
-
-    users = await get_user_subscription(telegram_id=chat_id)
-
-    if not users:
-        text = 'У вас пока нет подписок на пользователей'
-        return await context.bot.send_message(chat_id, text)
-    for user in users:
-        user_telegram_id = user['telegram_id']
-        telegram_username = user['telegram_username']
-        button = [InlineKeyboardButton(
-            "Удалить из избранного",
-            callback_data=('delete_subscribe_button|'
-                           f'{user_telegram_id}|'
-                           f'{telegram_username}')
-            )]
-        keyboard = InlineKeyboardMarkup([button])
-        text = f'@{telegram_username}'
-        return await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=text,
-                    reply_markup=keyboard,
-                    )
 
 
 def main():
