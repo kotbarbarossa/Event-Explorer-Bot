@@ -1,14 +1,12 @@
 import os
 from dotenv import load_dotenv
 import logging
-import re
 
 from telegram import (Update, InlineKeyboardMarkup, InlineKeyboardButton,
                       ReplyKeyboardMarkup)
 from telegram.constants import ParseMode
 from telegram.ext import (filters, MessageHandler, ApplicationBuilder,
-                          CommandHandler, ContextTypes, CallbackContext,
-                          CallbackQueryHandler, ConversationHandler,)
+                          CommandHandler, ContextTypes)
 
 from get_backend_response import (get_command_response,
                                   get_message_response,
@@ -19,23 +17,16 @@ from get_backend_response import (get_command_response,
                                   get_search_by_name_response,
                                   get_user_subscription)
 
-from buttons import (details_button,
-                     create_fast_event_button,
-                     add_favorite_button,
-                     confirm_parti_button,
-                     delete_favorite_button,
-                     add_subscribe_button,
-                     delete_subscribe_button)
+from buttons import buttons_handlers
 
 from parsers import parse_element, parse_event
 
 from conversations.create_event import create_event_conversation
+from conversations.search_place import search_by_name_conversation
 
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-
-SEARCH_NAME, SEARCH_REGION_NAME = range(2)
 
 BUTTONS = [
     ['🌟 Избранное 🌟', '🕺 Подписки 🕺'],
@@ -178,7 +169,10 @@ async def user_subscriptions(
         return await context.bot.send_message(chat_id, text)
     for user in users:
         user_telegram_id = user['telegram_id']
-        telegram_username = user['telegram_username']
+        telegram_username = (
+            user['telegram_username']
+            if user['telegram_username']
+            else '-скрыто-@')
         button = [InlineKeyboardButton(
             "Удалить из избранного",
             callback_data=('delete_subscribe_button|'
@@ -187,81 +181,11 @@ async def user_subscriptions(
             )]
         keyboard = InlineKeyboardMarkup([button])
         text = f'@{telegram_username}'
-        return await context.bot.send_message(
+        await context.bot.send_message(
                     chat_id=chat_id,
                     text=text,
                     reply_markup=keyboard,
                     )
-
-
-async def search_place(update: Update, context: CallbackContext):
-    """
-    Функция запускает переписку с пользователем.
-    Пользователь последовательно вводит имя места и регион.
-    Последняя функция в цепочке выводит результат поиска по параметрам.
-    """
-    context.user_data['search'] = {}
-    context.user_data['search']['chat_id'] = str(
-        update.message.from_user.id)
-
-    await update.message.reply_text(
-        'В целях безопасности поиск ограничен в выдаче.'
-        '\nВведи название заведения:')
-    return SEARCH_NAME
-
-
-async def search_name(update: Update, context: CallbackContext):
-    """Функция принимает и проверяет имя места."""
-    text = update.message.text
-    match = re.match(r'^\s*[a-zA-Zа-яА-Я\s]{1,25}\s*$', text)
-    if not match:
-        await update.message.reply_text(
-            'Нет такое имя не пойдет!'
-            '\nТолько буквы. Не больше 25 символов!'
-            '\nПопробуй ещё разок дружок пирожок:')
-        return SEARCH_NAME
-
-    search = context.user_data["search"]
-
-    search['place_name'] = text
-
-    chat_id = update.effective_chat.id
-    await context.bot.send_message(
-        chat_id, 'Введи название региона или города или района:')
-    return SEARCH_REGION_NAME
-
-
-async def search_region_name(update: Update, context: CallbackContext):
-    """
-    Функция принимает и проверяет название региона.
-    В случае успеха запускает поиск с заданными параметрами.
-    """
-    text = update.message.text
-    match = re.match(r'^\s*[a-zA-Zа-яА-Я\s]{1,25}\s*$', text)
-    if not match:
-        await update.message.reply_text(
-            'Нет такое название не пойдет!'
-            '\nТолько буквы. Не больше 25 символов!'
-            '\nПопробуй ещё разок дружок пирожок:')
-        return SEARCH_REGION_NAME
-
-    search = context.user_data["search"]
-    search['region_name'] = text
-    search_data = {
-        'chat_id': search['chat_id'],
-        'region_name': search['region_name'],
-        'place_name': search['place_name']
-    }
-
-    await handle_location(
-        update,
-        context,
-        search_data=search_data,
-        )
-
-    context.user_data.clear()
-
-    return ConversationHandler.END
 
 
 def main():
@@ -278,36 +202,12 @@ def main():
                 r'🕺 Подписки 🕺'), user_subscriptions)
     application.add_handler(user_subscription)
 
-    application.add_handler(CallbackQueryHandler(
-        details_button, pattern="details_button"))
-    application.add_handler(CallbackQueryHandler(
-        create_fast_event_button, pattern="create_fast_event_button"))
-    application.add_handler(CallbackQueryHandler(
-        add_favorite_button, pattern="add_favorite_button"))
-    application.add_handler(CallbackQueryHandler(
-        confirm_parti_button, pattern="confirm_parti_button"))
-    application.add_handler(CallbackQueryHandler(
-        delete_favorite_button, pattern="delete_favorite_button"))
-    application.add_handler(CallbackQueryHandler(
-        delete_subscribe_button, pattern="delete_subscribe_button"))
-    application.add_handler(CallbackQueryHandler(
-        add_subscribe_button, pattern="add_subscribe_button"))
+    for handler in buttons_handlers:
+        application.add_handler(handler)
 
     application.add_handler(create_event_conversation)
 
-    search_by_handler = ConversationHandler(
-        entry_points=[MessageHandler(
-            filters.TEXT & filters.Regex(
-                r'^Поиск'), search_place)],
-        states={
-            SEARCH_NAME: [MessageHandler(
-                filters.TEXT & (~filters.COMMAND), search_name)],
-            SEARCH_REGION_NAME: [MessageHandler(
-                filters.TEXT & (~filters.COMMAND), search_region_name)],
-        },
-        fallbacks=[]
-    )
-    application.add_handler(search_by_handler)
+    application.add_handler(search_by_name_conversation)
 
     echo_handler = MessageHandler(
         filters.TEXT & (~filters.COMMAND), handle_message)

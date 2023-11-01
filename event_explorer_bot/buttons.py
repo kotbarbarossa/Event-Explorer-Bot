@@ -3,7 +3,7 @@ import random
 
 from telegram import (Update, InlineKeyboardMarkup, InlineKeyboardButton)
 from telegram.constants import ParseMode
-from telegram.ext import CallbackContext
+from telegram.ext import CallbackContext, CallbackQueryHandler
 
 from get_backend_response import (post_event,
                                   post_event_subscription,
@@ -275,3 +275,21 @@ async def add_subscribe_button(update: Update, context: CallbackContext):
         telegram_id=str(telegram_id), subscription_id=str(subscription_id))
     await context.bot.send_message(
         telegram_id, f'Ты подписался на {subscription_username}!')
+
+
+buttons_handlers = [
+    CallbackQueryHandler(
+        details_button, pattern="details_button"),
+    CallbackQueryHandler(
+        create_fast_event_button, pattern="create_fast_event_button"),
+    CallbackQueryHandler(
+        add_favorite_button, pattern="add_favorite_button"),
+    CallbackQueryHandler(
+        confirm_parti_button, pattern="confirm_parti_button"),
+    CallbackQueryHandler(
+        delete_favorite_button, pattern="delete_favorite_button"),
+    CallbackQueryHandler(
+        delete_subscribe_button, pattern="delete_subscribe_button"),
+    CallbackQueryHandler(
+        add_subscribe_button, pattern="add_subscribe_button"),
+]
