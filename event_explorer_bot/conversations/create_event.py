@@ -36,7 +36,7 @@ async def create_event(update: Update, context: CallbackContext):
     else:
         await update.message.reply_text(
             'Неверный формат команды. '
-            'Используйте /create_event_<place_id>')
+            'Используй /create_event_<place_id>')
         return ConversationHandler.END
 
 
@@ -132,14 +132,14 @@ async def get_event_duration(update: Update, context: CallbackContext):
             pass
         else:
             await update.message.reply_text(
-                'Ни куда не годится!'
-                '\nНе больше 12 часов!'
+                'Так не пойдет!'
+                '\nОт 1 до 12 часов!'
                 '\nПопробуй ещё разок дружок пирожок:')
             return EVENT_DURATION
     except ValueError:
         await update.message.reply_text(
-            'Ни куда не годится!'
-            '\nТолько цифра!'
+            'Никуда не годится!'
+            '\nТолько число от 1 до 12!'
             '\nПопробуй ещё разок дружок пирожок:')
         return EVENT_DURATION
 

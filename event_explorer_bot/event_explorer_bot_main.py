@@ -59,8 +59,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             is_bot=is_bot)
         text = (
             'Привет! Ты тут в первый раз!\n'
-            'Ты так рано что у нас ещё нет инструкции для тебя!\n'
-            'Сорян придется тыкать пальчиками самому!'
+            'Ты так рано, что у нас ещё нет инструкции для тебя!\n'
+            'Просто отправь сюда локацию!'
                 )
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
@@ -165,7 +165,7 @@ async def user_subscriptions(
     users = await get_user_subscription(telegram_id=chat_id)
 
     if not users:
-        text = 'У вас пока нет подписок на пользователей'
+        text = 'У тебя пока нет подписок на пользователей.'
         return await context.bot.send_message(chat_id, text)
     for user in users:
         user_telegram_id = user['telegram_id']
