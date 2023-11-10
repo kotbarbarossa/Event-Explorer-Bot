@@ -1,0 +1,48 @@
+version: '3.3'
+
+volumes:
+  event_static_value:
+  event_media_value:
+  event_db_data:
+
+services:
+  event_db:
+    image: postgres:13.0-alpine
+    restart: always
+    volumes:
+      - event_db_data:/var/lib/postgresql/data/
+    env_file:
+      - ./.env
+    networks:
+      - event_bot_network      
+    container_name: event_bot_db
+
+  event_backend:
+    image: kotbarbarossa/event_explorer_backend:latest
+    ports:
+      - "8000:8000"    
+    restart: always
+    volumes:
+      - event_static_value:/backend/static/
+      - event_media_value:/backend/media/
+    depends_on:
+      - event_db
+    env_file:
+      - ./.env
+    networks:
+      - event_bot_network      
+    container_name: event_explorer_backend
+
+  event_bot:
+    image: kotbarbarossa/event_explorer_bot:latest
+    restart: always
+    depends_on:
+      - event_backend    
+    env_file:
+      - ./.env
+    networks:
+      - event_bot_network      
+    container_name: event_explorer_bot
+
+networks:
+  event_bot_network:
