@@ -132,8 +132,8 @@ async def handle_location(
         return await message.answer(
             text='Ни чего не найдено 🤷‍♂️',
             reply_markup=reply_markup)
-    ELEMENT_LIMIT = 20
-    for element in response[:ELEMENT_LIMIT]:
+    element_limit = 20
+    for element in response[:element_limit]:
         if element['tags'].get('name'):
             element_id = element['id']
             events = element.get('events')
@@ -159,6 +159,7 @@ async def handle_location(
                 text=text,
                 reply_markup=(inline_keyboard.as_markup())
                 )
+    return None
 
 
 async def user_favotite_places(message: Message) -> None:
@@ -198,6 +199,7 @@ async def user_subscriptions(message: types.Message,):
                 text=text,
                 reply_markup=inline_keyboard.as_markup(),
                 )
+    return None
 
 
 @dp.callback_query(lambda query: query.data.startswith('details_button'))
@@ -505,6 +507,7 @@ async def process_name(message: Message, state: FSMContext) -> None:
     await message.answer(
         'Введи название региона или города или района:',
     )
+    return None
 
 
 @dp.message(SearchPlaceForm.region_name)
@@ -613,6 +616,7 @@ async def create_event_name(message: Message, state: FSMContext) -> None:
     await message.answer(
         'Введи описание события:',
     )
+    return None
 
 
 @dp.message(EventCreationForm.event_description)
@@ -633,6 +637,7 @@ async def create_event_description(
     await message.answer(
         'Введи дату события (дд-мм-гггг):',
     )
+    return None
 
 
 @dp.message(EventCreationForm.event_date)
@@ -650,6 +655,7 @@ async def create_event_date(message: Message, state: FSMContext) -> None:
     await message.answer(
         'Введи время начала (чч:мм):',
         )
+    return None
 
 
 @dp.message(EventCreationForm.event_time)
@@ -667,6 +673,7 @@ async def create_event_time(message: Message, state: FSMContext) -> None:
     await message.answer(
         'Введи длительность в часах:',
         )
+    return None
 
 
 @dp.message(EventCreationForm.event_duration)
@@ -713,6 +720,7 @@ async def create_event_duration(message: Message, state: FSMContext) -> None:
     await message.answer(
                 text='Событие создано!',
                 reply_markup=reply_markup)
+    return None
 
 
 @dp.message()

@@ -23,8 +23,8 @@ async def get_response(*args, **kwargs) -> Union[dict, Any]:
 
     if response.status_code == 200:
         return response.json()
-    else:
-        return {'error': 'Failed to get the response'}
+
+    return {'error': 'Failed to get the response'}
 
 
 async def get_command_response(
