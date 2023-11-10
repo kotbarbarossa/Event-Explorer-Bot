@@ -3,7 +3,7 @@ from typing import Any, Union
 
 import httpx
 
-base_url = 'http://0.0.0.0:8000'
+base_url = 'http://event_backend:8001'
 
 
 async def get_response(*args, **kwargs) -> Union[dict, Any]:
