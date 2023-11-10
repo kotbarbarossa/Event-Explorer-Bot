@@ -1,42 +1,30 @@
 import asyncio
-import os
-from datetime import datetime, timedelta
-import random
 import logging
+import os
+import random
 import re
-
-from dotenv import load_dotenv
+from datetime import datetime, timedelta
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
-from aiogram.types import (Message,
-                           KeyboardButton,
-                           ReplyKeyboardMarkup,
-                           InlineKeyboardButton,
-                           CallbackQuery)
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-
-
-from get_backend_response import (get_command_response,
+from aiogram.types import (CallbackQuery, InlineKeyboardButton, KeyboardButton,
+                           Message, ReplyKeyboardMarkup)
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from dotenv import load_dotenv
+from get_backend_response import (delete_place_subscription,
+                                  delete_user_subscription,
+                                  get_command_response, get_location_response,
                                   get_message_response,
-                                  get_location_response,
-                                  get_user,
-                                  post_user,
-                                  get_place_subscription,
-                                  get_search_by_name_response,
-                                  get_user_subscription)
-
-from get_backend_response import (post_event,
-                                  post_event_subscription,
                                   get_place_detail_response,
-                                  post_place_subscription,
-                                  delete_place_subscription,
-                                  post_user_subscription,
-                                  delete_user_subscription)
-
+                                  get_place_subscription,
+                                  get_search_by_name_response, get_user,
+                                  get_user_subscription, post_event,
+                                  post_event_subscription,
+                                  post_place_subscription, post_user,
+                                  post_user_subscription)
 from parsers import parse_element, parse_event
 
 load_dotenv()

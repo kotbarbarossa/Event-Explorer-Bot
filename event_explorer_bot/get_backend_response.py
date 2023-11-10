@@ -1,6 +1,7 @@
-import httpx
 import asyncio
-from typing import Union, Any
+from typing import Any, Union
+
+import httpx
 
 base_url = 'http://0.0.0.0:8000'
 
